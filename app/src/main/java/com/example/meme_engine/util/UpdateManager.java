@@ -97,10 +97,12 @@ public class UpdateManager {
                     UpdateInfo info = parseUpdateInfo(jsonResponse);
 
                     int currentVersionCode = getCurrentVersionCode(activity);
+                    String currentVersionName = getCurrentVersionName(activity);
 
                     new Handler(Looper.getMainLooper()).post(() -> {
                         if (activity.isFinishing() || activity.isDestroyed()) return;
 
+                        // Strict version code comparison as instructed
                         if (currentVersionCode < info.minVersionCode) {
                             // FORCED UPDATE: Cannot be dismissed
                             showForcedUpdateDialog(activity, info);
@@ -108,7 +110,7 @@ public class UpdateManager {
                             // OPTIONAL UPDATE
                             showOptionalUpdateDialog(activity, info);
                         } else if (manualCheck) {
-                            Toast.makeText(activity, "Meme Engine is up to date! (v" + BuildConfig.VERSION_NAME + ")", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(activity, "Meme Engine is up to date! (v" + currentVersionName + ", code " + currentVersionCode + ")", Toast.LENGTH_SHORT).show();
                         }
                     });
                 } else {
@@ -151,28 +153,35 @@ public class UpdateManager {
         }
         info.apkUrl = apkUrl;
 
-        // Try parsing version codes from json properties or fallback to tag parsing (e.g. v1.1 -> 2 or 11)
+        // Parse latestVersionCode from JSON or fallback to parsing tag into integer code
         info.latestVersionCode = jsonResponse.optInt("latestVersionCode", parseVersionCodeFromTag(info.tagName));
-        info.minVersionCode = jsonResponse.optInt("minVersionCode", 0); // Default to 0 if absent
+        info.minVersionCode = jsonResponse.optInt("minVersionCode", 0);
 
         return info;
     }
 
     private static int parseVersionCodeFromTag(String tag) {
         if (tag == null) return 1;
-        String clean = tag.replaceAll("[^0-9]", "");
-        if (clean.isEmpty()) return 1;
         try {
             String[] parts = tag.replaceAll("[^0-9.]", "").split("\\.");
             if (parts.length >= 2) {
                 int major = Integer.parseInt(parts[0]);
                 int minor = Integer.parseInt(parts[1]);
-                return major * 10 + minor; // e.g. 1.1 -> 11, 1.0 -> 10
+                return major * 10 + minor; // e.g. "1.2" -> 12
             } else if (parts.length == 1 && !parts[0].isEmpty()) {
                 return Integer.parseInt(parts[0]);
             }
         } catch (Exception ignored) {}
         return 1;
+    }
+
+    public static String getCurrentVersionName(Context context) {
+        try {
+            PackageInfo pInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+            return pInfo.versionName != null ? pInfo.versionName : "1.2";
+        } catch (Exception e) {
+            return BuildConfig.VERSION_NAME;
+        }
     }
 
     private static int getCurrentVersionCode(Context context) {
@@ -296,6 +305,15 @@ public class UpdateManager {
                 out.close();
                 in.close();
                 conn.disconnect();
+
+                // Verify file size and content
+                long fileSize = apkFile.length();
+                Log.d(TAG, "Downloaded update APK size: " + fileSize + " bytes");
+
+                if (fileSize < 100000) {
+                    // Less than 100KB means it's an error/HTML page, not a real APK
+                    throw new Exception("Downloaded file is invalid (size: " + fileSize + " bytes)");
+                }
 
                 new Handler(Looper.getMainLooper()).post(() -> installApk(activity, apkFile));
 
