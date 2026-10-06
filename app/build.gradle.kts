@@ -12,7 +12,7 @@ android {
         applicationId = "com.example.meme_engine"
         minSdk = 24
         targetSdk = 37
-        versionCode = 3
+        versionCode = 12
         versionName = "1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
