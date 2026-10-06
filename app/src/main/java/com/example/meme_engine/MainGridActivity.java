@@ -32,6 +32,7 @@ import com.example.meme_engine.util.FileUtil;
 import com.example.meme_engine.util.MemeScanner;
 import com.example.meme_engine.util.StorageHelper;
 import com.example.meme_engine.util.UpdateManager;
+import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.tabs.TabLayout;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -49,10 +50,12 @@ public class MainGridActivity extends AppCompatActivity {
     private LinearLayout llSourceTab;
     private TextView tvSourceFolderName;
     private EditText etSourceSearch;
+    private ChipGroup chipGroupFilter;
     private RecyclerView rvSourceGrid;
     private TextView tvSourceEmpty;
     private MemeAdapter sourceAdapter;
     private List<Uri> currentSourceScannedUris = new ArrayList<>();
+    private String currentChipFilter = "All"; // Default is "All" every time app opens (not persisted)
 
     // Destination Tab fields
     private LinearLayout llDestinationTab;
@@ -122,6 +125,8 @@ public class MainGridActivity extends AppCompatActivity {
                 isGranted -> {
                     if (isGranted) {
                         loadSourceTab();
+                        // Trigger automatic 24h throttled update check after permission flow
+                        UpdateManager.checkAutomaticUpdate(this);
                     } else {
                         Toast.makeText(this, "Permission denied. Cannot scan memes.", Toast.LENGTH_SHORT).show();
                     }
@@ -136,6 +141,7 @@ public class MainGridActivity extends AppCompatActivity {
         tvSourceFolderName = findViewById(R.id.tvSourceFolderName);
         Button btnSelectSourceFolder = findViewById(R.id.btnSelectSourceFolder);
         etSourceSearch = findViewById(R.id.etSourceSearch);
+        chipGroupFilter = findViewById(R.id.chipGroupFilter);
         rvSourceGrid = findViewById(R.id.rvSourceGrid);
         tvSourceEmpty = findViewById(R.id.tvSourceEmpty);
 
@@ -158,17 +164,30 @@ public class MainGridActivity extends AppCompatActivity {
             sourceFolderPickerLauncher.launch(intent);
         });
 
+        // WHY: Re-filter instantly on search text change while keeping full memory list intact
         etSourceSearch.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                performSourceSearch(s.toString());
+                applyFilters();
             }
 
             @Override
             public void afterTextChanged(Editable s) {}
+        });
+
+        // WHY: Handle chip selection changes ("All", "Tagged", "Untagged") ensuring single selection and applying filters immediately
+        chipGroupFilter.setOnCheckedStateChangeListener((group, checkedIds) -> {
+            if (checkedIds.contains(R.id.chipTagged)) {
+                currentChipFilter = "Tagged";
+            } else if (checkedIds.contains(R.id.chipUntagged)) {
+                currentChipFilter = "Untagged";
+            } else {
+                currentChipFilter = "All";
+            }
+            applyFilters();
         });
 
         // Destination Adapter
@@ -220,24 +239,12 @@ public class MainGridActivity extends AppCompatActivity {
         });
 
         checkPermissionAndLoad();
-
-        // Silent background check for app updates on launch
-        UpdateManager.checkForUpdates(this, false);
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.main_menu, menu);
         return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
-        if (item.getItemId() == R.id.action_check_updates) {
-            UpdateManager.checkForUpdates(this, true);
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
     }
 
     private void checkPermissionAndLoad() {
@@ -247,6 +254,8 @@ public class MainGridActivity extends AppCompatActivity {
 
         if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
             loadSourceTab();
+            // Trigger automatic background update check after permission & load flow
+            UpdateManager.checkAutomaticUpdate(this);
         } else {
             requestPermissionLauncher.launch(permission);
         }
@@ -262,17 +271,34 @@ public class MainGridActivity extends AppCompatActivity {
         tvSourceFolderName.setText("Source: " + StorageHelper.getFolderName(this, sourceFolder));
 
         MemeScanner.scanFolder(this, sourceFolder, imageUris -> {
-            runOnUiThread(() -> {
-                currentSourceScannedUris = imageUris;
-                performSourceSearch(etSourceSearch.getText().toString());
+            // WHY: Record firstSeen for newly scanned images in background thread so newest memes appear first without breaking badges
+            executorService.execute(() -> {
+                long now = System.currentTimeMillis();
+                for (Uri uri : imageUris) {
+                    Meme existing = MemeDatabase.getDatabase(this).memeDao().getByUri(uri.toString());
+                    if (existing == null) {
+                        // Create lightweight Room row for untagged newly scanned image to track arrival timestamp
+                        Meme newMeme = new Meme(uri.toString(), null, now, now);
+                        MemeDatabase.getDatabase(this).memeDao().insert(newMeme);
+                    }
+                }
+                runOnUiThread(() -> {
+                    currentSourceScannedUris = imageUris;
+                    applyFilters();
+                });
             });
         });
     }
 
-    private void performSourceSearch(String query) {
+    /**
+     * UNIFIED FILTER METHOD: Combines chip selection ("All", "Tagged", "Untagged") and search query,
+     * sorts results by firstSeen descending (newest first), and updates the adapter.
+     */
+    private void applyFilters() {
         executorService.execute(() -> {
             List<Uri> displayUris = new ArrayList<>();
             Map<String, String> tagsMap = new HashMap<>();
+            Map<Uri, Long> firstSeenMap = new HashMap<>();
 
             if (currentSourceScannedUris == null || currentSourceScannedUris.isEmpty()) {
                 runOnUiThread(() -> {
@@ -283,26 +309,50 @@ public class MainGridActivity extends AppCompatActivity {
                 return;
             }
 
-            String q = query != null ? query.trim() : "";
+            String query = etSourceSearch != null && etSourceSearch.getText() != null
+                    ? etSourceSearch.getText().toString().trim()
+                    : "";
 
             for (Uri uri : currentSourceScannedUris) {
                 Meme meme = MemeDatabase.getDatabase(this).memeDao().getByUri(uri.toString());
                 String memeTags = meme != null ? meme.tags : null;
+                boolean isTagged = memeTags != null && !memeTags.trim().isEmpty();
+                long firstSeen = meme != null ? meme.firstSeen : 0L;
 
-                if (q.isEmpty()) {
+                // 1. Evaluate Chip Filter rule
+                boolean passesChip = true;
+                if ("Tagged".equals(currentChipFilter)) {
+                    passesChip = isTagged;
+                } else if ("Untagged".equals(currentChipFilter)) {
+                    passesChip = !isTagged;
+                }
+
+                // 2. Evaluate Search rule
+                boolean passesSearch = true;
+                if (!query.isEmpty()) {
+                    passesSearch = matchesSearch(memeTags, query);
+                }
+
+                if (passesChip && passesSearch) {
                     displayUris.add(uri);
                     if (memeTags != null) {
                         tagsMap.put(uri.toString(), memeTags);
                     }
-                } else {
-                    if (matchesSearch(memeTags, q)) {
-                        displayUris.add(uri);
-                        if (memeTags != null) {
-                            tagsMap.put(uri.toString(), memeTags);
-                        }
-                    }
+                    firstSeenMap.put(uri, firstSeen);
                 }
             }
+
+            // 3. Sort displayed list by firstSeen descending (Newest memes first), fallback to URI string for stable sort
+            displayUris.sort((u1, u2) -> {
+                Long fs1Obj = firstSeenMap.get(u1);
+                long fs1 = fs1Obj != null ? fs1Obj : 0L;
+                Long fs2Obj = firstSeenMap.get(u2);
+                long fs2 = fs2Obj != null ? fs2Obj : 0L;
+                if (fs1 != fs2) {
+                    return Long.compare(fs2, fs1); // Descending
+                }
+                return u1.toString().compareTo(u2.toString());
+            });
 
             runOnUiThread(() -> {
                 sourceAdapter.setImages(displayUris);
@@ -347,9 +397,16 @@ public class MainGridActivity extends AppCompatActivity {
         TagMemeDialogFragment dialog = TagMemeDialogFragment.newInstance(uri, existingTags);
         dialog.setOnTagSavedListener((memeUri, newTags) -> {
             executorService.execute(() -> {
-                Meme meme = new Meme(memeUri.toString(), newTags, System.currentTimeMillis());
+                // WHY: Preserve original firstSeen timestamp when tagging so tagging does not alter grid position
+                Meme existing = MemeDatabase.getDatabase(this).memeDao().getByUri(memeUri.toString());
+                long originalFirstSeen = existing != null ? existing.firstSeen : System.currentTimeMillis();
+                long dateAdded = existing != null ? existing.dateAdded : System.currentTimeMillis();
+
+                Meme meme = new Meme(memeUri.toString(), newTags, dateAdded, originalFirstSeen);
                 MemeDatabase.getDatabase(this).memeDao().insert(meme);
-                runOnUiThread(() -> performSourceSearch(etSourceSearch.getText().toString()));
+                
+                // Re-apply filters immediately on main thread so newly tagged meme disappears if "Untagged" chip is selected
+                runOnUiThread(this::applyFilters);
             });
         });
         dialog.show(getSupportFragmentManager(), "TagMemeDialog");

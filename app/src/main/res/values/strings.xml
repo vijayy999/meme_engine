@@ -27,4 +27,7 @@
     <string name="delete_selected">Delete Selected</string>
     <string name="no_destination_memes">No images in destination folder.</string>
     <string name="check_for_updates">Check for Updates</string>
+    <string name="chip_all">All</string>
+    <string name="chip_tagged">Tagged</string>
+    <string name="chip_untagged">Untagged</string>
 </resources>
