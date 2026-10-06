@@ -9,7 +9,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
-import android.provider.Settings;
 import android.util.Log;
 import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
@@ -79,6 +78,7 @@ public class UpdateManager {
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 conn.setRequestProperty("Accept", "application/vnd.github+json");
+                conn.setRequestProperty("User-Agent", "MemeEngine-App");
                 conn.setConnectTimeout(8000);
                 conn.setReadTimeout(8000);
 
@@ -163,12 +163,11 @@ public class UpdateManager {
         String clean = tag.replaceAll("[^0-9]", "");
         if (clean.isEmpty()) return 1;
         try {
-            // e.g. "1.1" -> 11 or "2" -> 2. Let's parse float/int or parse dotted version to integer code.
             String[] parts = tag.replaceAll("[^0-9.]", "").split("\\.");
             if (parts.length >= 2) {
                 int major = Integer.parseInt(parts[0]);
                 int minor = Integer.parseInt(parts[1]);
-                return major * 10 + minor; // e.g. 1.1 -> 11, 1.0 -> 10, 2.0 -> 20
+                return major * 10 + minor; // e.g. 1.1 -> 11, 1.0 -> 10
             } else if (parts.length == 1 && !parts[0].isEmpty()) {
                 return Integer.parseInt(parts[0]);
             }
@@ -193,7 +192,7 @@ public class UpdateManager {
         new AlertDialog.Builder(activity)
                 .setTitle("🎉 New Update Available (" + info.tagName + ")")
                 .setMessage(info.message)
-                .setPositiveButton("Update", (dialog, which) -> openUpdateUrl(activity, info.apkUrl))
+                .setPositiveButton("Update Now", (dialog, which) -> checkPermissionAndDownload(activity, info.apkUrl))
                 .setNegativeButton("Later", null)
                 .show();
     }
@@ -203,8 +202,7 @@ public class UpdateManager {
                 .setTitle("⚠️ Mandatory Update Required (" + info.tagName + ")")
                 .setMessage("A critical update is required to continue using Meme Engine.\n\n" + info.message)
                 .setPositiveButton("Update Now", (d, w) -> {
-                    openUpdateUrl(activity, info.apkUrl);
-                    // Re-show forced dialog if user tries to bypass
+                    checkPermissionAndDownload(activity, info.apkUrl);
                     activity.finishAffinity();
                 })
                 .setCancelable(false)
@@ -214,15 +212,91 @@ public class UpdateManager {
         dialog.show();
     }
 
-    private static void openUpdateUrl(Activity activity, String apkUrl) {
-        if (apkUrl == null || apkUrl.isEmpty()) {
-            apkUrl = GITHUB_RELEASE_API.replace("/releases/latest", "/releases");
+    private static void checkPermissionAndDownload(Activity activity, String downloadUrl) {
+        if (downloadUrl == null || downloadUrl.isEmpty()) {
+            Toast.makeText(activity, "APK download link not found.", Toast.LENGTH_SHORT).show();
+            return;
         }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (!activity.getPackageManager().canRequestPackageInstalls()) {
+                new AlertDialog.Builder(activity)
+                        .setTitle("Permission Needed")
+                        .setMessage("To install the new update, please allow Meme Engine to install unknown apps in settings.")
+                        .setPositiveButton("Go to Settings", (dialog, which) -> {
+                            Intent intent = new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                            intent.setData(Uri.parse("package:" + activity.getPackageName()));
+                            activity.startActivity(intent);
+                        })
+                        .setNegativeButton(R.string.cancel, null)
+                        .show();
+                return;
+            }
+        }
+        downloadAndInstallApk(activity, downloadUrl);
+    }
+
+    public static void downloadAndInstallApk(Activity activity, String downloadUrl) {
+        Toast.makeText(activity, "Downloading update...", Toast.LENGTH_LONG).show();
+
+        executorService.execute(() -> {
+            try {
+                URL url = new URL(downloadUrl);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setInstanceFollowRedirects(true);
+                conn.setRequestMethod("GET");
+                conn.setRequestProperty("User-Agent", "MemeEngine-App");
+                conn.setConnectTimeout(15000);
+                conn.setReadTimeout(15000);
+                conn.connect();
+
+                File apkFile = new File(activity.getCacheDir(), "meme_engine_update.apk");
+                if (apkFile.exists()) {
+                    boolean deleted = apkFile.delete();
+                    if (!deleted) Log.w(TAG, "Could not delete old apk file before downloading");
+                }
+
+                InputStream in = conn.getInputStream();
+                FileOutputStream out = new FileOutputStream(apkFile);
+
+                byte[] buffer = new byte[8192];
+                int bytesRead;
+                while ((bytesRead = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, bytesRead);
+                }
+
+                out.flush();
+                out.close();
+                in.close();
+
+                new Handler(Looper.getMainLooper()).post(() -> installApk(activity, apkFile));
+
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to download update APK: " + e.getMessage(), e);
+                new Handler(Looper.getMainLooper()).post(() ->
+                        Toast.makeText(activity, "Failed to download update.", Toast.LENGTH_SHORT).show()
+                );
+            }
+        });
+    }
+
+    private static void installApk(Context context, File apkFile) {
         try {
-            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl));
-            activity.startActivity(intent);
+            Uri apkUri = FileProvider.getUriForFile(
+                    context,
+                    context.getPackageName() + ".fileprovider",
+                    apkFile
+            );
+
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+            context.startActivity(intent);
         } catch (Exception e) {
-            Toast.makeText(activity, "Unable to open update link.", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Error launching package installer: " + e.getMessage(), e);
+            Toast.makeText(context, "Error opening installer: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 }
