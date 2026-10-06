@@ -8,7 +8,7 @@
     android:orientation="vertical"
     tools:context=".MainGridActivity">
 
-    <!-- Top App Bar without any menu search icon -->
+    <!-- Top App Bar with update menu -->
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
@@ -16,7 +16,8 @@
         android:layout_marginTop="16dp"
         android:background="#1E1E1E"
         app:title="@string/app_name"
-        app:titleTextColor="#FFFFFF" />
+        app:titleTextColor="#FFFFFF"
+        app:menu="@menu/main_menu" />
 
     <!-- Pill TabLayout with Centered Equal Alignment -->
     <com.google.android.material.tabs.TabLayout

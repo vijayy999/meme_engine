@@ -81,7 +81,15 @@ public class MainGridActivity extends AppCompatActivity {
             startActivityForResult(searchIntent, 1001);
         }
 
-        setSupportActionBar(findViewById(R.id.toolbar));
+        com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        toolbar.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == R.id.action_check_updates) {
+                UpdateManager.checkForUpdates(this, true);
+                return true;
+            }
+            return false;
+        });
 
         sourceFolderPickerLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
