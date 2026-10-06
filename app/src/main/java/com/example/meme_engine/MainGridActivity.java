@@ -8,6 +8,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -29,6 +31,7 @@ import com.example.meme_engine.ui.TagMemeDialogFragment;
 import com.example.meme_engine.util.FileUtil;
 import com.example.meme_engine.util.MemeScanner;
 import com.example.meme_engine.util.StorageHelper;
+import com.example.meme_engine.util.UpdateManager;
 import com.google.android.material.tabs.TabLayout;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -209,6 +212,24 @@ public class MainGridActivity extends AppCompatActivity {
         });
 
         checkPermissionAndLoad();
+
+        // Silent background check for app updates on launch
+        UpdateManager.checkForUpdates(this, false);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == R.id.action_check_updates) {
+            UpdateManager.checkForUpdates(this, true);
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     private void checkPermissionAndLoad() {
