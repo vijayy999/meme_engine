@@ -1,0 +1,29 @@
+<resources>
+    <string name="app_name">Meme Engine</string>
+    <string name="meme_thumbnail">Meme Thumbnail</string>
+    <string name="tag_status_badge">Tag Status Badge</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="destination">Destination</string>
+    <string name="normal_tags_label">Normal Tags:</string>
+    <string name="normal_tags_hint">e.g. gta fail, funny</string>
+    <string name="hashtags_label">Hashtags (#):</string>
+    <string name="hashtags_hint">e.g. #wasted #died</string>
+    <string name="search_hint">Search tags or #hashtags…</string>
+    <string name="copy_to_destination">Copy to Destination</string>
+    <string name="confirm_folder_change">Use this folder as your meme folder?</string>
+    <string name="confirm">Confirm</string>
+    <string name="share">Share</string>
+    <string name="menu_search">Search</string>
+    <string name="menu_folder">Select Folder</string>
+    <string name="tab_source">Source</string>
+    <string name="tab_destination">Destination</string>
+    <string name="select_source_folder">Source Folder</string>
+    <string name="select_destination_folder">Destination Folder</string>
+    <string name="no_destination_folder">No destination folder set. Tap to select.</string>
+    <string name="copied_to_destination">Copied to Destination folder!</string>
+    <string name="failed_to_copy">Failed to copy image.</string>
+    <string name="delete_selected">Delete Selected</string>
+    <string name="no_destination_memes">No images in destination folder.</string>
+</resources>
