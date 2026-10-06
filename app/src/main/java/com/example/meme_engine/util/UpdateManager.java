@@ -241,14 +241,41 @@ public class UpdateManager {
 
         executorService.execute(() -> {
             try {
-                URL url = new URL(downloadUrl);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setInstanceFollowRedirects(true);
-                conn.setRequestMethod("GET");
-                conn.setRequestProperty("User-Agent", "MemeEngine-App");
-                conn.setConnectTimeout(15000);
-                conn.setReadTimeout(15000);
-                conn.connect();
+                String currentUrl = downloadUrl;
+                HttpURLConnection conn = null;
+                boolean redirected;
+                int redirectsCount = 0;
+
+                // Handle GitHub release asset redirects (Amazon S3) manually
+                do {
+                    redirected = false;
+                    URL url = new URL(currentUrl);
+                    conn = (HttpURLConnection) url.openConnection();
+                    conn.setInstanceFollowRedirects(false);
+                    conn.setRequestMethod("GET");
+                    conn.setRequestProperty("User-Agent", "MemeEngine-App");
+                    conn.setConnectTimeout(15000);
+                    conn.setReadTimeout(15000);
+                    conn.connect();
+
+                    int status = conn.getResponseCode();
+                    if (status == HttpURLConnection.HTTP_MOVED_TEMP ||
+                            status == HttpURLConnection.HTTP_MOVED_PERM ||
+                            status == HttpURLConnection.HTTP_SEE_OTHER ||
+                            status == 307 || status == 308) {
+                        String newUrl = conn.getHeaderField("Location");
+                        if (newUrl != null) {
+                            currentUrl = newUrl;
+                            redirected = true;
+                            redirectsCount++;
+                            conn.disconnect();
+                        }
+                    }
+                } while (redirected && redirectsCount < 5);
+
+                if (conn.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                    throw new Exception("Server returned HTTP " + conn.getResponseCode());
+                }
 
                 File apkFile = new File(activity.getCacheDir(), "meme_engine_update.apk");
                 if (apkFile.exists()) {
@@ -268,13 +295,14 @@ public class UpdateManager {
                 out.flush();
                 out.close();
                 in.close();
+                conn.disconnect();
 
                 new Handler(Looper.getMainLooper()).post(() -> installApk(activity, apkFile));
 
             } catch (Exception e) {
                 Log.e(TAG, "Failed to download update APK: " + e.getMessage(), e);
                 new Handler(Looper.getMainLooper()).post(() ->
-                        Toast.makeText(activity, "Failed to download update.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(activity, "Failed to download update: " + e.getMessage(), Toast.LENGTH_SHORT).show()
                 );
             }
         });
