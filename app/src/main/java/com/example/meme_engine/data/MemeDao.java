@@ -13,6 +13,9 @@ public interface MemeDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void insert(Meme meme);
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    void insertAll(List<Meme> memes);
+
     @Update
     void update(Meme meme);
 

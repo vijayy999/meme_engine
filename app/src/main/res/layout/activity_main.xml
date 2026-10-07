@@ -4,41 +4,41 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#121212"
+    android:background="@color/canvas_bg"
     android:orientation="vertical"
     tools:context=".MainGridActivity">
 
-    <!-- Top App Bar with update menu -->
+    <!-- Top App Header with App Title & Refresh / Update Action -->
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:layout_marginTop="16dp"
-        android:background="#1E1E1E"
+        android:background="@color/canvas_bg"
+        app:menu="@menu/main_menu"
         app:title="@string/app_name"
-        app:titleTextColor="#FFFFFF"
-        app:menu="@menu/main_menu" />
+        app:titleCentered="false"
+        app:titleTextAppearance="@style/TextAppearance.Material3.TitleLarge"
+        app:titleTextColor="@color/text_primary" />
 
-    <!-- Pill TabLayout with Centered Equal Alignment -->
+    <!-- Mode Switch Tabs: Source vs Destination -->
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tabLayout"
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:layout_marginStart="16dp"
-        android:layout_marginTop="16dp"
-        android:layout_marginEnd="16dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="4dp"
         android:layout_marginBottom="12dp"
         android:background="@drawable/bg_tab_container"
         app:tabGravity="fill"
-        app:tabMode="fixed"
         app:tabIndicator="@drawable/bg_tab_indicator"
-        app:tabIndicatorGravity="stretch"
         app:tabIndicatorColor="@null"
         app:tabIndicatorFullWidth="true"
+        app:tabIndicatorGravity="stretch"
+        app:tabMode="fixed"
         app:tabRippleColor="@null"
-        app:tabSelectedTextColor="#FFFFFF"
-        app:tabTextAppearance="@style/TextAppearance.AppCompat.Medium"
-        app:tabTextColor="#A0A0A0" />
+        app:tabSelectedTextColor="@color/text_primary"
+        app:tabTextAppearance="@style/TextAppearance.Material3.LabelLarge"
+        app:tabTextColor="@color/text_muted" />
 
     <!-- SOURCE TAB CONTAINER -->
     <LinearLayout
@@ -46,88 +46,140 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="12dp">
+        android:paddingHorizontal="12dp">
 
+        <!-- Folder Selector Bar -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:background="@drawable/bg_folder_bar"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingBottom="8dp">
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginEnd="8dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_folder" />
 
             <TextView
                 android:id="@+id/tvSourceFolderName"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:ellipsize="middle"
+                android:singleLine="true"
                 android:text="@string/select_source_folder"
-                android:textColor="#E6E0E9"
-                android:textSize="14sp"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
                 android:textStyle="bold" />
 
             <Button
                 android:id="@+id/btnSelectSourceFolder"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="#D0BCFF"
-                app:strokeColor="#79747E"
-                android:text="@string/menu_folder" />
+                android:layout_height="36dp"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="0dp"
+                android:text="@string/menu_folder"
+                android:textColor="@color/primary_violet"
+                android:textSize="12sp"
+                app:strokeColor="@color/primary_violet" />
 
         </LinearLayout>
 
+        <!-- Rounded Search Bar Field -->
         <EditText
             android:id="@+id/etSourceSearch"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
+            android:layout_height="44dp"
+            android:layout_marginBottom="10dp"
             android:autofillHints="none"
+            android:background="@drawable/bg_search_input"
             android:drawableStart="@drawable/ic_search"
-            android:drawablePadding="8dp"
+            android:drawablePadding="10dp"
             android:hint="@string/search_hint"
-            android:textColorHint="#808080"
-            android:textColor="#FFFFFF"
             android:inputType="text"
-            android:singleLine="true" />
+            android:paddingHorizontal="14dp"
+            android:singleLine="true"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_hint"
+            android:textSize="13sp" />
 
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/chipGroupFilter"
+        <!-- Filter Chips Row (All, Tagged, Untagged, Refresh) -->
+        <HorizontalScrollView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            app:singleSelection="true"
-            app:selectionRequired="true">
+            android:overScrollMode="never"
+            android:scrollbars="none">
 
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipAll"
-                style="@style/Widget.Material3.Chip.Filter"
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chipGroupFilter"
                 android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:checked="true"
-                android:text="@string/chip_all"
-                android:textColor="#E6E0E9"
-                app:chipBackgroundColor="#2B2930" />
+                android:layout_height="wrap_content"
+                app:selectionRequired="true"
+                app:singleLine="true"
+                app:singleSelection="true">
 
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipTagged"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:text="@string/chip_tagged"
-                android:textColor="#E6E0E9"
-                app:chipBackgroundColor="#2B2930" />
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipAll"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:checked="true"
+                    android:text="@string/chip_all"
+                    android:textColor="@color/text_primary"
+                    app:chipBackgroundColor="@color/surface_muted"
+                    app:chipStrokeColor="@color/surface_border"
+                    app:chipStrokeWidth="1dp" />
 
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipUntagged"
-                style="@style/Widget.Material3.Chip.Filter"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:text="@string/chip_untagged"
-                android:textColor="#E6E0E9"
-                app:chipBackgroundColor="#2B2930" />
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipTagged"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="@string/chip_tagged"
+                    android:textColor="@color/text_primary"
+                    app:chipBackgroundColor="@color/surface_muted"
+                    app:chipStrokeColor="@color/surface_border"
+                    app:chipStrokeWidth="1dp" />
 
-        </com.google.android.material.chip.ChipGroup>
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipUntagged"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:text="@string/chip_untagged"
+                    android:textColor="@color/text_primary"
+                    app:chipBackgroundColor="@color/surface_muted"
+                    app:chipStrokeColor="@color/surface_border"
+                    app:chipStrokeWidth="1dp" />
 
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipRefresh"
+                    style="@style/Widget.Material3.Chip.Assist"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:checkable="false"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:text="@string/chip_refresh"
+                    android:textColor="@color/text_primary"
+                    app:chipIcon="@drawable/ic_update"
+                    app:chipIconTint="@color/primary_violet"
+                    app:chipBackgroundColor="@color/surface_muted"
+                    app:chipStrokeColor="@color/surface_border"
+                    app:chipStrokeWidth="1dp" />
+
+            </com.google.android.material.chip.ChipGroup>
+        </HorizontalScrollView>
+
+        <!-- 3-Column Grid Canvas -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent">
@@ -136,6 +188,8 @@
                 android:id="@+id/rvSourceGrid"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="12dp"
                 app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
                 app:spanCount="3" />
 
@@ -144,9 +198,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
-                android:text="No memes found in source folder"
-                android:textColor="#808080"
-                android:textSize="16sp"
+                android:text="@string/no_source_memes"
+                android:textColor="@color/text_muted"
+                android:textSize="15sp"
                 android:visibility="gone" />
 
         </FrameLayout>
@@ -159,34 +213,50 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="12dp"
+        android:paddingHorizontal="12dp"
         android:visibility="gone">
 
+        <!-- Folder Selector Bar -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:background="@drawable/bg_folder_bar"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingBottom="8dp">
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp">
+
+            <ImageView
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginEnd="8dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_folder" />
 
             <TextView
                 android:id="@+id/tvDestinationFolderName"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:ellipsize="middle"
+                android:singleLine="true"
                 android:text="@string/select_destination_folder"
-                android:textColor="#E6E0E9"
-                android:textSize="14sp"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
                 android:textStyle="bold" />
 
             <Button
                 android:id="@+id/btnSelectDestinationFolder"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="#D0BCFF"
-                app:strokeColor="#79747E"
-                android:text="@string/menu_folder" />
+                android:layout_height="36dp"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="0dp"
+                android:text="@string/menu_folder"
+                android:textColor="@color/primary_violet"
+                android:textSize="12sp"
+                app:strokeColor="@color/primary_violet" />
 
         </LinearLayout>
 
@@ -195,9 +265,12 @@
             android:id="@+id/llMultiSelectBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_folder_bar"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingBottom="8dp"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="6dp"
             android:visibility="gone">
 
             <TextView
@@ -206,7 +279,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="0 Selected"
-                android:textColor="#D0BCFF"
+                android:textColor="@color/accent_lilac"
                 android:textSize="14sp"
                 android:textStyle="bold" />
 
@@ -214,23 +287,28 @@
                 android:id="@+id/btnCancelSelection"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="4dp"
-                android:textColor="#E6E0E9"
-                app:strokeColor="#79747E"
-                android:text="@string/cancel" />
+                android:layout_height="36dp"
+                android:layout_marginEnd="6dp"
+                android:paddingHorizontal="10dp"
+                android:text="@string/cancel"
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp"
+                app:strokeColor="@color/surface_border" />
 
             <Button
                 android:id="@+id/btnDeleteSelected"
                 style="?attr/materialButtonStyle"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:backgroundTint="#F2B8B5"
-                android:textColor="#601410"
-                android:text="@string/delete_selected" />
+                android:layout_height="36dp"
+                android:backgroundTint="@color/status_untagged"
+                android:paddingHorizontal="10dp"
+                android:text="@string/delete_selected"
+                android:textColor="@color/white"
+                android:textSize="12sp" />
 
         </LinearLayout>
 
+        <!-- 3-Column Grid Canvas -->
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent">
@@ -239,6 +317,8 @@
                 android:id="@+id/rvDestinationGrid"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingBottom="12dp"
                 app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
                 app:spanCount="3" />
 
@@ -248,8 +328,8 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:text="@string/no_destination_memes"
-                android:textColor="#808080"
-                android:textSize="16sp"
+                android:textColor="@color/text_muted"
+                android:textSize="15sp"
                 android:visibility="gone" />
 
         </FrameLayout>

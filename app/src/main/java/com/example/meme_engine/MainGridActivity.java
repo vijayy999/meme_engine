@@ -8,6 +8,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -32,10 +33,12 @@ import com.example.meme_engine.util.FileUtil;
 import com.example.meme_engine.util.MemeScanner;
 import com.example.meme_engine.util.StorageHelper;
 import com.example.meme_engine.util.UpdateManager;
+import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.tabs.TabLayout;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,6 +47,7 @@ import java.util.concurrent.Executors;
 
 public class MainGridActivity extends AppCompatActivity {
 
+    private static final String PERF_TAG = "PerformanceTest";
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
     // Source Tab fields
@@ -51,11 +55,13 @@ public class MainGridActivity extends AppCompatActivity {
     private TextView tvSourceFolderName;
     private EditText etSourceSearch;
     private ChipGroup chipGroupFilter;
+    private Chip chipRefresh;
     private RecyclerView rvSourceGrid;
     private TextView tvSourceEmpty;
     private MemeAdapter sourceAdapter;
     private List<Uri> currentSourceScannedUris = new ArrayList<>();
     private String currentChipFilter = "All"; // Default is "All" every time app opens (not persisted)
+    private int latestRefreshScanId = 0;
 
     // Destination Tab fields
     private LinearLayout llDestinationTab;
@@ -142,6 +148,7 @@ public class MainGridActivity extends AppCompatActivity {
         Button btnSelectSourceFolder = findViewById(R.id.btnSelectSourceFolder);
         etSourceSearch = findViewById(R.id.etSourceSearch);
         chipGroupFilter = findViewById(R.id.chipGroupFilter);
+        chipRefresh = findViewById(R.id.chipRefresh);
         rvSourceGrid = findViewById(R.id.rvSourceGrid);
         tvSourceEmpty = findViewById(R.id.tvSourceEmpty);
 
@@ -189,6 +196,10 @@ public class MainGridActivity extends AppCompatActivity {
             }
             applyFilters();
         });
+
+        if (chipRefresh != null) {
+            chipRefresh.setOnClickListener(v -> performRefresh());
+        }
 
         // Destination Adapter
         destinationAdapter = new DestinationAdapter(new DestinationAdapter.DestinationListener() {
@@ -270,21 +281,143 @@ public class MainGridActivity extends AppCompatActivity {
 
         tvSourceFolderName.setText("Source: " + StorageHelper.getFolderName(this, sourceFolder));
 
+        final long totalStartTime = System.nanoTime();
+
         MemeScanner.scanFolder(this, sourceFolder, imageUris -> {
-            // WHY: Record firstSeen for newly scanned images in background thread so newest memes appear first without breaking badges
             executorService.execute(() -> {
-                long now = System.currentTimeMillis();
-                for (Uri uri : imageUris) {
-                    Meme existing = MemeDatabase.getDatabase(this).memeDao().getByUri(uri.toString());
-                    if (existing == null) {
-                        // Create lightweight Room row for untagged newly scanned image to track arrival timestamp
-                        Meme newMeme = new Meme(uri.toString(), null, now, now);
-                        MemeDatabase.getDatabase(this).memeDao().insert(newMeme);
+                // (b) Single batch DB fetch
+                long dbStart = System.nanoTime();
+                List<Meme> dbMemes = MemeDatabase.getDatabase(this).memeDao().getAll();
+                Map<String, Meme> memeMap = new HashMap<>();
+                if (dbMemes != null) {
+                    for (Meme m : dbMemes) {
+                        memeMap.put(m.imageUri, m);
                     }
                 }
+                long dbTimeMs = (System.nanoTime() - dbStart) / 1_000_000;
+                Log.d(PERF_TAG, "(b) getAll() and map building completed in " + dbTimeMs + " ms. Map size: " + memeMap.size());
+
+                // (c) Batch insert missing URIs
+                long insertStart = System.nanoTime();
+                long now = System.currentTimeMillis();
+                List<Meme> newMemesToInsert = new ArrayList<>();
+
+                for (Uri uri : imageUris) {
+                    String uriStr = uri.toString();
+                    if (!memeMap.containsKey(uriStr)) {
+                        Meme newMeme = new Meme(uriStr, null, now, now);
+                        newMemesToInsert.add(newMeme);
+                        memeMap.put(uriStr, newMeme); // Update in-memory map
+                    }
+                }
+
+                if (!newMemesToInsert.isEmpty()) {
+                    MemeDatabase.getDatabase(this).memeDao().insertAll(newMemesToInsert);
+                }
+                long insertTimeMs = (System.nanoTime() - insertStart) / 1_000_000;
+                Log.d(PERF_TAG, "(c) Batch insert completed in " + insertTimeMs + " ms. Inserted " + newMemesToInsert.size() + " new memes.");
+
+                currentSourceScannedUris = imageUris;
+
+                // Apply filters with in-memory map
+                applyFiltersWithMap(memeMap, totalStartTime);
+            });
+        });
+    }
+
+    private void performRefresh() {
+        Uri sourceFolder = StorageHelper.getSourceFolderUri(this);
+        if (sourceFolder == null) {
+            Toast.makeText(this, "Select a source folder first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (chipRefresh != null) {
+            chipRefresh.setEnabled(false);
+        }
+
+        final int scanId = ++latestRefreshScanId;
+        final long refreshStart = System.nanoTime();
+
+        MemeScanner.scanFolder(this, sourceFolder, imageUris -> {
+            executorService.execute(() -> {
+                if (scanId != latestRefreshScanId) {
+                    return;
+                }
+
+                List<Meme> dbMemes = MemeDatabase.getDatabase(this).memeDao().getAll();
+                Map<String, Meme> memeMap = new HashMap<>();
+                if (dbMemes != null) {
+                    for (Meme m : dbMemes) {
+                        memeMap.put(m.imageUri, m);
+                    }
+                }
+
+                List<Uri> oldUris = currentSourceScannedUris != null ? currentSourceScannedUris : new ArrayList<>();
+                Set<String> oldUriSet = new HashSet<>();
+                for (Uri u : oldUris) {
+                    oldUriSet.add(u.toString());
+                }
+
+                List<Uri> newScannedUris = imageUris != null ? imageUris : new ArrayList<>();
+                Set<String> newUriSet = new HashSet<>();
+                for (Uri u : newScannedUris) {
+                    newUriSet.add(u.toString());
+                }
+
+                int newCount = 0;
+                long now = System.currentTimeMillis();
+                List<Meme> newMemesToInsert = new ArrayList<>();
+
+                for (Uri u : newScannedUris) {
+                    String uriStr = u.toString();
+                    if (!oldUriSet.contains(uriStr)) {
+                        newCount++;
+                    }
+                    if (!memeMap.containsKey(uriStr)) {
+                        Meme newMeme = new Meme(uriStr, null, now, now);
+                        newMemesToInsert.add(newMeme);
+                        memeMap.put(uriStr, newMeme);
+                    }
+                }
+
+                int removedCount = 0;
+                for (Uri u : oldUris) {
+                    if (!newUriSet.contains(u.toString())) {
+                        removedCount++;
+                    }
+                }
+
+                if (!newMemesToInsert.isEmpty()) {
+                    MemeDatabase.getDatabase(this).memeDao().insertAll(newMemesToInsert);
+                }
+
+                boolean hasChanged = (newCount > 0 || removedCount > 0 || newScannedUris.size() != oldUris.size());
+                long elapsedMs = (System.nanoTime() - refreshStart) / 1_000_000;
+
+                Log.d(PERF_TAG, "Refresh completed in " + elapsedMs + " ms. " + newCount + " new, " + removedCount + " removed.");
+
+                String toastMessage;
+                if (!hasChanged) {
+                    toastMessage = "No new images";
+                } else if (newCount > 0 && removedCount == 0) {
+                    toastMessage = newCount + " new image(s) found";
+                } else if (newCount == 0 && removedCount > 0) {
+                    toastMessage = removedCount + " image(s) removed";
+                } else {
+                    toastMessage = newCount + " new, " + removedCount + " removed";
+                }
+
                 runOnUiThread(() -> {
-                    currentSourceScannedUris = imageUris;
-                    applyFilters();
+                    if (chipRefresh != null) {
+                        chipRefresh.setEnabled(true);
+                    }
+                    Toast.makeText(this, toastMessage, Toast.LENGTH_SHORT).show();
+
+                    if (hasChanged && scanId == latestRefreshScanId) {
+                        currentSourceScannedUris = newScannedUris;
+                        applyFiltersWithMap(memeMap, refreshStart);
+                    }
                 });
             });
         });
@@ -296,69 +429,87 @@ public class MainGridActivity extends AppCompatActivity {
      */
     private void applyFilters() {
         executorService.execute(() -> {
-            List<Uri> displayUris = new ArrayList<>();
-            Map<String, String> tagsMap = new HashMap<>();
-            Map<Uri, Long> firstSeenMap = new HashMap<>();
-
-            if (currentSourceScannedUris == null || currentSourceScannedUris.isEmpty()) {
-                runOnUiThread(() -> {
-                    sourceAdapter.setImages(new ArrayList<>());
-                    sourceAdapter.setTags(new HashMap<>());
-                    tvSourceEmpty.setVisibility(View.VISIBLE);
-                });
-                return;
-            }
-
-            String query = etSourceSearch != null && etSourceSearch.getText() != null
-                    ? etSourceSearch.getText().toString().trim()
-                    : "";
-
-            for (Uri uri : currentSourceScannedUris) {
-                Meme meme = MemeDatabase.getDatabase(this).memeDao().getByUri(uri.toString());
-                String memeTags = meme != null ? meme.tags : null;
-                boolean isTagged = memeTags != null && !memeTags.trim().isEmpty();
-                long firstSeen = meme != null ? meme.firstSeen : 0L;
-
-                // 1. Evaluate Chip Filter rule
-                boolean passesChip = true;
-                if ("Tagged".equals(currentChipFilter)) {
-                    passesChip = isTagged;
-                } else if ("Untagged".equals(currentChipFilter)) {
-                    passesChip = !isTagged;
-                }
-
-                // 2. Evaluate Search rule
-                boolean passesSearch = true;
-                if (!query.isEmpty()) {
-                    passesSearch = matchesSearch(memeTags, query);
-                }
-
-                if (passesChip && passesSearch) {
-                    displayUris.add(uri);
-                    if (memeTags != null) {
-                        tagsMap.put(uri.toString(), memeTags);
-                    }
-                    firstSeenMap.put(uri, firstSeen);
+            List<Meme> dbMemes = MemeDatabase.getDatabase(this).memeDao().getAll();
+            Map<String, Meme> memeMap = new HashMap<>();
+            if (dbMemes != null) {
+                for (Meme m : dbMemes) {
+                    memeMap.put(m.imageUri, m);
                 }
             }
+            applyFiltersWithMap(memeMap, System.nanoTime());
+        });
+    }
 
-            // 3. Sort displayed list by firstSeen descending (Newest memes first), fallback to URI string for stable sort
-            displayUris.sort((u1, u2) -> {
-                Long fs1Obj = firstSeenMap.get(u1);
-                long fs1 = fs1Obj != null ? fs1Obj : 0L;
-                Long fs2Obj = firstSeenMap.get(u2);
-                long fs2 = fs2Obj != null ? fs2Obj : 0L;
-                if (fs1 != fs2) {
-                    return Long.compare(fs2, fs1); // Descending
-                }
-                return u1.toString().compareTo(u2.toString());
-            });
+    private void applyFiltersWithMap(Map<String, Meme> memeMap, long totalStartTime) {
+        List<Uri> displayUris = new ArrayList<>();
+        Map<String, String> tagsMap = new HashMap<>();
+        Map<Uri, Long> firstSeenMap = new HashMap<>();
 
+        if (currentSourceScannedUris == null || currentSourceScannedUris.isEmpty()) {
             runOnUiThread(() -> {
-                sourceAdapter.setImages(displayUris);
-                sourceAdapter.setTags(tagsMap);
-                tvSourceEmpty.setVisibility(displayUris.isEmpty() ? View.VISIBLE : View.GONE);
+                sourceAdapter.setImages(new ArrayList<>());
+                sourceAdapter.setTags(new HashMap<>());
+                tvSourceEmpty.setVisibility(View.VISIBLE);
+
+                long totalTimeMs = (System.nanoTime() - totalStartTime) / 1_000_000;
+                Log.d(PERF_TAG, "(d) Total time until grid is shown: " + totalTimeMs + " ms.");
             });
+            return;
+        }
+
+        String query = etSourceSearch != null && etSourceSearch.getText() != null
+                ? etSourceSearch.getText().toString().trim()
+                : "";
+
+        for (Uri uri : currentSourceScannedUris) {
+            String uriStr = uri.toString();
+            Meme meme = memeMap.get(uriStr);
+            String memeTags = meme != null ? meme.tags : null;
+            boolean isTagged = memeTags != null && !memeTags.trim().isEmpty();
+            long firstSeen = meme != null ? meme.firstSeen : 0L;
+
+            // 1. Evaluate Chip Filter rule
+            boolean passesChip = true;
+            if ("Tagged".equals(currentChipFilter)) {
+                passesChip = isTagged;
+            } else if ("Untagged".equals(currentChipFilter)) {
+                passesChip = !isTagged;
+            }
+
+            // 2. Evaluate Search rule
+            boolean passesSearch = true;
+            if (!query.isEmpty()) {
+                passesSearch = matchesSearch(memeTags, query);
+            }
+
+            if (passesChip && passesSearch) {
+                displayUris.add(uri);
+                if (memeTags != null) {
+                    tagsMap.put(uriStr, memeTags);
+                }
+                firstSeenMap.put(uri, firstSeen);
+            }
+        }
+
+        // 3. Sort displayed list by firstSeen descending (Newest memes first), fallback to URI string for stable sort
+        displayUris.sort((u1, u2) -> {
+            Long fs1Obj = firstSeenMap.get(u1);
+            long fs1 = fs1Obj != null ? fs1Obj : 0L;
+            Long fs2Obj = firstSeenMap.get(u2);
+            long fs2 = fs2Obj != null ? fs2Obj : 0L;
+            if (fs1 != fs2) {
+                return Long.compare(fs2, fs1); // Descending
+            }
+            return u1.toString().compareTo(u2.toString());
+        });
+
+        runOnUiThread(() -> {
+            sourceAdapter.setImages(displayUris);
+            sourceAdapter.setTags(tagsMap);
+            tvSourceEmpty.setVisibility(displayUris.isEmpty() ? View.VISIBLE : View.GONE);
+
+            long totalTimeMs = (System.nanoTime() - totalStartTime) / 1_000_000;
+            Log.d(PERF_TAG, "(d) Total time until grid is shown: " + totalTimeMs + " ms.");
         });
     }
 
