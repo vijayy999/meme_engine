@@ -5,6 +5,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
@@ -55,10 +56,17 @@ public class MemeAdapter extends RecyclerView.Adapter<MemeAdapter.MemeViewHolder
                 .centerCrop()
                 .into(holder.ivMemeThumbnail);
 
-        if (tags != null && !tags.isEmpty()) {
+        if (tags != null && !tags.trim().isEmpty()) {
             holder.ivBadge.setImageResource(R.drawable.ic_tag_done);
+            if (holder.tvTagPreview != null) {
+                holder.tvTagPreview.setVisibility(View.VISIBLE);
+                holder.tvTagPreview.setText(tags.trim());
+            }
         } else {
             holder.ivBadge.setImageResource(R.drawable.ic_tag_none);
+            if (holder.tvTagPreview != null) {
+                holder.tvTagPreview.setVisibility(View.GONE);
+            }
         }
 
         holder.itemView.setOnClickListener(v -> listener.onMemeClick(uri, tags));
@@ -72,11 +80,13 @@ public class MemeAdapter extends RecyclerView.Adapter<MemeAdapter.MemeViewHolder
     static class MemeViewHolder extends RecyclerView.ViewHolder {
         ImageView ivMemeThumbnail;
         ImageView ivBadge;
+        TextView tvTagPreview;
 
         public MemeViewHolder(@NonNull View itemView) {
             super(itemView);
             ivMemeThumbnail = itemView.findViewById(R.id.ivMemeThumbnail);
             ivBadge = itemView.findViewById(R.id.ivBadge);
+            tvTagPreview = itemView.findViewById(R.id.tvTagPreview);
         }
     }
 }

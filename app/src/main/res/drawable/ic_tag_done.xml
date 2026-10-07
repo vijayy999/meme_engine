@@ -3,7 +3,20 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+  <!-- Dark Circle Background -->
   <path
-      android:fillColor="#4CAF50"
-      android:pathData="M9,16.17L4.83,12l-1.42,1.41L9,19 21,7l-1.41,-1.41z"/>
+      android:fillColor="#CC0B0B0E"
+      android:pathData="M12,12m-10,0a10,10 0,1 1,20 0a10,10 0,1 1,-20 0" />
+  <!-- Emerald Green Border Ring -->
+  <path
+      android:strokeColor="#10B981"
+      android:strokeWidth="1.2"
+      android:pathData="M12,12m-9.4,0a9.4,9.4 0,1 1,18.8 0a9.4,9.4 0,1 1,-18.8 0" />
+  <!-- Emerald Green Checkmark Icon -->
+  <path
+      android:strokeColor="#10B981"
+      android:strokeWidth="2.2"
+      android:strokeLineCap="round"
+      android:strokeLineJoin="round"
+      android:pathData="M8,12.2 L10.7,14.9 L16,9.1" />
 </vector>

@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:insetTop="2dp"
-    android:insetBottom="2dp"
-    android:insetLeft="2dp"
-    android:insetRight="2dp">
+    android:insetTop="3dp"
+    android:insetBottom="3dp"
+    android:insetLeft="3dp"
+    android:insetRight="3dp">
     <shape android:shape="rectangle">
-        <solid android:color="#4F378B" />
-        <corners android:radius="10dp" />
+        <gradient
+            android:startColor="@color/primary_violet"
+            android:endColor="@color/accent_lilac"
+            android:angle="0" />
+        <corners android:radius="13dp" />
     </shape>
 </inset>

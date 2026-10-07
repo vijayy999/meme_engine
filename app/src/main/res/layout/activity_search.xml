@@ -4,28 +4,31 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#121212">
+    android:background="@color/canvas_bg">
 
     <EditText
         android:id="@+id/etSearch"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="44dp"
         android:layout_margin="12dp"
         android:autofillHints="none"
-        android:background="#252525"
+        android:background="@drawable/bg_search_input"
         android:drawableStart="@drawable/ic_search"
-        android:drawablePadding="8dp"
+        android:drawablePadding="10dp"
         android:hint="@string/search_hint"
         android:inputType="text"
-        android:padding="14dp"
-        android:textColor="#FFFFFF"
-        android:textColorHint="#808080"
+        android:paddingHorizontal="14dp"
+        android:singleLine="true"
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_hint"
+        android:textSize="13sp"
         app:layout_constraintTop_toTopOf="parent" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvSearchResults"
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:clipToPadding="false"
         android:padding="4dp"
         app:layoutManager="androidx.recyclerview.widget.GridLayoutManager"
         app:layout_constraintBottom_toBottomOf="parent"

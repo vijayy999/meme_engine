@@ -1,14 +1,15 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Dark Theme for the entire application -->
     <style name="Base.Theme.Meme_engine" parent="Theme.Material3.Dark.NoActionBar">
-        <item name="android:windowBackground">#121212</item>
-        <item name="colorSurface">#1E1E1E</item>
-        <item name="colorPrimary">#D0BCFF</item>
-        <item name="colorOnPrimary">#381E72</item>
-        <item name="colorContainer">#2B2930</item>
-        <item name="colorOnContainer">#E6E0E9</item>
-        <item name="android:textColorPrimary">#FFFFFF</item>
-        <item name="android:textColorSecondary">#CAC4D0</item>
+        <item name="android:windowBackground">@color/canvas_bg</item>
+        <item name="colorSurface">@color/surface_card</item>
+        <item name="colorPrimary">@color/primary_violet</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/accent_lilac</item>
+        <item name="colorContainer">@color/surface_muted</item>
+        <item name="colorOnContainer">@color/text_secondary</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_muted</item>
         <item name="dialogTheme">@style/CustomDarkDialog</item>
     </style>
 

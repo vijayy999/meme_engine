@@ -1,28 +1,66 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="2dp">
+    android:layout_margin="2dp"
+    app:cardBackgroundColor="@color/surface_card"
+    app:cardCornerRadius="@dimen/meme_corner_radius"
+    app:cardElevation="0dp"
+    app:cardPreventCornerOverlap="false"
+    app:cardUseCompatPadding="false"
+    app:strokeWidth="0dp">
 
-    <ImageView
-        android:id="@+id/ivMemeThumbnail"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:scaleType="centerCrop"
-        app:layout_constraintDimensionRatio="1:1"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        android:contentDescription="@string/meme_thumbnail" />
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
 
-    <ImageView
-        android:id="@+id/ivBadge"
-        android:layout_width="24dp"
-        android:layout_height="24dp"
-        android:layout_margin="4dp"
-        app:layout_constraintBottom_toBottomOf="@+id/ivMemeThumbnail"
-        app:layout_constraintEnd_toEndOf="@+id/ivMemeThumbnail"
-        android:contentDescription="@string/tag_status_badge" />
+        <!-- Square 1:1 Thumbnail -->
+        <ImageView
+            android:id="@+id/ivMemeThumbnail"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:scaleType="centerCrop"
+            android:background="@color/surface_card"
+            app:layout_constraintDimensionRatio="1:1"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            android:contentDescription="@string/meme_thumbnail" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+        <!-- Tag Text Preview Overlay (Bottom Left) -->
+        <TextView
+            android:id="@+id/tvTagPreview"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginBottom="4dp"
+            android:background="@drawable/bg_tag_preview"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:paddingHorizontal="5dp"
+            android:paddingVertical="2dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="@+id/ivMemeThumbnail"
+            app:layout_constraintStart_toStartOf="@+id/ivMemeThumbnail"
+            app:layout_constraintWidth_max="75dp"
+            tools:text="#reaction"
+            tools:visibility="visible" />
+
+        <!-- Tag Status Icon Badge (Bottom Right) -->
+        <ImageView
+            android:id="@+id/ivBadge"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_margin="4dp"
+            app:layout_constraintBottom_toBottomOf="@+id/ivMemeThumbnail"
+            app:layout_constraintEnd_toEndOf="@+id/ivMemeThumbnail"
+            android:contentDescription="@string/tag_status_badge"
+            tools:src="@drawable/ic_tag_done" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</com.google.android.material.card.MaterialCardView>

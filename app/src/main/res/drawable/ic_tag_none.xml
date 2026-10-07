@@ -3,7 +3,20 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+  <!-- Dark Circle Background -->
   <path
-      android:fillColor="#F44336"
-      android:pathData="M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z"/>
+      android:fillColor="#CC0B0B0E"
+      android:pathData="M12,12m-10,0a10,10 0,1 1,20 0a10,10 0,1 1,-20 0" />
+  <!-- Rose Red Border Ring -->
+  <path
+      android:strokeColor="#F43F5E"
+      android:strokeWidth="1.2"
+      android:pathData="M12,12m-9.4,0a9.4,9.4 0,1 1,18.8 0a9.4,9.4 0,1 1,-18.8 0" />
+  <!-- Rose Red X Icon -->
+  <path
+      android:strokeColor="#F43F5E"
+      android:strokeWidth="2.2"
+      android:strokeLineCap="round"
+      android:strokeLineJoin="round"
+      android:pathData="M9,9 L15,15 M15,9 L9,15" />
 </vector>

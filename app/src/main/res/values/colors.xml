@@ -1,5 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!-- Obsidian Kinetic Dark Theme Colors from DESIGN.md -->
+    <color name="canvas_bg">#0B0B0E</color>
+    <color name="surface_card">#13131A</color>
+    <color name="surface_muted">#1A1A24</color>
+    <color name="surface_container">#1F1F26</color>
+    <color name="surface_border">#2A2A38</color>
+
+    <!-- Accent Palette -->
+    <color name="primary_violet">#8B5CF6</color>
+    <color name="accent_lilac">#A855F7</color>
+    <color name="status_tagged">#10B981</color>
+    <color name="status_untagged">#F43F5E</color>
+
+    <!-- Standard Text & System Colors -->
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#F3F4F6</color>
+    <color name="text_muted">#9CA3AF</color>
+    <color name="text_hint">#4B5563</color>
 </resources>

@@ -3,73 +3,81 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="#222222"
+    android:background="@color/surface_card"
     android:orientation="vertical"
     android:padding="20dp">
 
-    <ImageView
+    <com.google.android.material.imageview.ShapeableImageView
         android:id="@+id/ivTagPreview"
         android:layout_width="140dp"
         android:layout_height="140dp"
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="16dp"
         android:scaleType="centerCrop"
+        app:cornerSize="12dp"
         android:contentDescription="@string/meme_thumbnail" />
 
     <!-- Normal Tags Field -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
         android:text="@string/normal_tags_label"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:textColor="#E6E0E9"
-        android:layout_marginBottom="4dp" />
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp"
+        android:textStyle="bold" />
 
     <EditText
         android:id="@+id/etTags"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="44dp"
+        android:layout_marginBottom="14dp"
         android:autofillHints="none"
+        android:background="@drawable/bg_search_input"
         android:hint="@string/normal_tags_hint"
-        android:textColorHint="#808080"
-        android:textColor="#FFFFFF"
         android:inputType="text"
+        android:paddingHorizontal="14dp"
         android:singleLine="true"
-        android:layout_marginBottom="12dp" />
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_hint"
+        android:textSize="13sp" />
 
     <!-- Hashtags (#) Field -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
         android:text="@string/hashtags_label"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:textColor="#D0BCFF"
-        android:layout_marginBottom="4dp" />
+        android:textColor="@color/accent_lilac"
+        android:textSize="13sp"
+        android:textStyle="bold" />
 
     <EditText
         android:id="@+id/etHashtags"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="44dp"
+        android:layout_marginBottom="20dp"
         android:autofillHints="none"
+        android:background="@drawable/bg_search_input"
         android:hint="@string/hashtags_hint"
-        android:textColorHint="#808080"
-        android:textColor="#D0BCFF"
         android:inputType="text"
+        android:paddingHorizontal="14dp"
         android:singleLine="true"
-        android:layout_marginBottom="20dp" />
+        android:textColor="@color/accent_lilac"
+        android:textColorHint="@color/text_hint"
+        android:textSize="13sp" />
 
     <!-- Action 1: Copy to Destination -->
     <Button
         android:id="@+id/btnDestination"
         style="?attr/materialButtonStyle"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="44dp"
+        android:layout_marginBottom="10dp"
+        android:backgroundTint="@color/primary_violet"
         android:text="@string/copy_to_destination"
-        android:backgroundTint="#D0BCFF"
-        android:textColor="#381E72"
-        android:layout_marginBottom="10dp" />
+        android:textColor="@color/white"
+        android:textSize="13sp" />
 
     <!-- Actions 2 & 3: Cancel and Save -->
     <LinearLayout
@@ -81,22 +89,24 @@
             android:id="@+id/btnCancel"
             style="?attr/materialButtonOutlinedStyle"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="44dp"
+            android:layout_marginEnd="8dp"
             android:layout_weight="1"
             android:text="@string/cancel"
-            android:textColor="#E6E0E9"
-            app:strokeColor="#79747E"
-            android:layout_marginEnd="8dp" />
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            app:strokeColor="@color/surface_border" />
 
         <Button
             android:id="@+id/btnSave"
             style="?attr/materialButtonStyle"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="44dp"
             android:layout_weight="1"
+            android:backgroundTint="@color/accent_lilac"
             android:text="@string/save"
-            android:backgroundTint="#D0BCFF"
-            android:textColor="#381E72" />
+            android:textColor="@color/white"
+            android:textSize="13sp" />
 
     </LinearLayout>
 
