@@ -30,6 +30,7 @@ import com.example.meme_engine.ui.MemeAdapter;
 import com.example.meme_engine.ui.SearchActivity;
 import com.example.meme_engine.ui.TagMemeDialogFragment;
 import com.example.meme_engine.util.FileUtil;
+import com.example.meme_engine.util.FuzzySearchMatcher;
 import com.example.meme_engine.util.MemeScanner;
 import com.example.meme_engine.util.StorageHelper;
 import com.example.meme_engine.util.UpdateManager;
@@ -424,8 +425,8 @@ public class MainGridActivity extends AppCompatActivity {
     }
 
     /**
-     * UNIFIED FILTER METHOD: Combines chip selection ("All", "Tagged", "Untagged") and search query,
-     * sorts results by firstSeen descending (newest first), and updates the adapter.
+     * UNIFIED FILTER METHOD: Combines chip selection ("All", "Tagged", "Untagged") and fuzzy search query,
+     * sorts results by relevance score descending and firstSeen descending, and updates the adapter.
      */
     private void applyFilters() {
         executorService.execute(() -> {
@@ -444,6 +445,7 @@ public class MainGridActivity extends AppCompatActivity {
         List<Uri> displayUris = new ArrayList<>();
         Map<String, String> tagsMap = new HashMap<>();
         Map<Uri, Long> firstSeenMap = new HashMap<>();
+        Map<Uri, Integer> matchScoreMap = new HashMap<>();
 
         if (currentSourceScannedUris == null || currentSourceScannedUris.isEmpty()) {
             runOnUiThread(() -> {
@@ -461,6 +463,8 @@ public class MainGridActivity extends AppCompatActivity {
                 ? etSourceSearch.getText().toString().trim()
                 : "";
 
+        boolean isSearchActive = !query.isEmpty();
+
         for (Uri uri : currentSourceScannedUris) {
             String uriStr = uri.toString();
             Meme meme = memeMap.get(uriStr);
@@ -476,10 +480,13 @@ public class MainGridActivity extends AppCompatActivity {
                 passesChip = !isTagged;
             }
 
-            // 2. Evaluate Search rule
+            // 2. Evaluate Fuzzy Search rule
             boolean passesSearch = true;
-            if (!query.isEmpty()) {
-                passesSearch = matchesSearch(memeTags, query);
+            int score = 0;
+            if (isSearchActive) {
+                FuzzySearchMatcher.MatchResult matchResult = FuzzySearchMatcher.match(memeTags, query);
+                passesSearch = matchResult.isMatch;
+                score = matchResult.score;
             }
 
             if (passesChip && passesSearch) {
@@ -488,17 +495,30 @@ public class MainGridActivity extends AppCompatActivity {
                     tagsMap.put(uriStr, memeTags);
                 }
                 firstSeenMap.put(uri, firstSeen);
+                matchScoreMap.put(uri, score);
             }
         }
 
-        // 3. Sort displayed list by firstSeen descending (Newest memes first), fallback to URI string for stable sort
+        // 3. Sort displayed list:
+        //    - When search is active: best match score descending, then firstSeen descending
+        //    - When search box is empty: newest first (firstSeen descending)
         displayUris.sort((u1, u2) -> {
+            if (isSearchActive) {
+                Integer s1Obj = matchScoreMap.get(u1);
+                int s1 = s1Obj != null ? s1Obj : 0;
+                Integer s2Obj = matchScoreMap.get(u2);
+                int s2 = s2Obj != null ? s2Obj : 0;
+                if (s1 != s2) {
+                    return Integer.compare(s2, s1); // Higher score first
+                }
+            }
+
             Long fs1Obj = firstSeenMap.get(u1);
             long fs1 = fs1Obj != null ? fs1Obj : 0L;
             Long fs2Obj = firstSeenMap.get(u2);
             long fs2 = fs2Obj != null ? fs2Obj : 0L;
             if (fs1 != fs2) {
-                return Long.compare(fs2, fs1); // Descending
+                return Long.compare(fs2, fs1); // Descending (newest first)
             }
             return u1.toString().compareTo(u2.toString());
         });
@@ -511,37 +531,6 @@ public class MainGridActivity extends AppCompatActivity {
             long totalTimeMs = (System.nanoTime() - totalStartTime) / 1_000_000;
             Log.d(PERF_TAG, "(d) Total time until grid is shown: " + totalTimeMs + " ms.");
         });
-    }
-
-    private boolean matchesSearch(String tagsStr, String query) {
-        if (tagsStr == null || tagsStr.trim().isEmpty() || query == null || query.trim().isEmpty()) {
-            return false;
-        }
-
-        String q = query.trim().toLowerCase();
-        String[] tokens = tagsStr.trim().split("\\s+");
-
-        if (q.startsWith("#")) {
-            for (String token : tokens) {
-                if (token.startsWith("#")) {
-                    String t = token.toLowerCase();
-                    if (t.equals(q) || t.contains(q)) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        } else {
-            for (String token : tokens) {
-                if (!token.startsWith("#")) {
-                    String t = token.toLowerCase();
-                    if (t.equals(q) || t.contains(q)) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
     }
 
     private void openTagDialogForUri(Uri uri, String existingTags) {
