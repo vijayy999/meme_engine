@@ -26,6 +26,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
+import com.example.meme_engine.data.CopiedMeme;
 import com.example.meme_engine.data.Meme;
 import com.example.meme_engine.data.MemeDatabase;
 import com.example.meme_engine.ui.DestinationAdapter;
@@ -52,6 +53,7 @@ import java.util.concurrent.Executors;
 public class MainGridActivity extends AppCompatActivity {
 
     private static final String PERF_TAG = "PerformanceTest";
+    private static final long CLEANUP_THRESHOLD_MS = 24 * 60 * 60 * 1000L; // 24 hours
     private final ExecutorService executorService = Executors.newSingleThreadExecutor();
 
     // Source Tab fields
@@ -285,6 +287,95 @@ public class MainGridActivity extends AppCompatActivity {
         });
 
         checkPermissionAndLoad();
+        handleSharedImageIntent(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleSharedImageIntent(intent);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        performDestinationAutoClean();
+    }
+
+    private void handleSharedImageIntent(Intent intent) {
+        if (intent == null) return;
+        String action = intent.getAction();
+        String type = intent.getType();
+
+        if (Intent.ACTION_SEND.equals(action) && type != null && type.startsWith("image/")) {
+            // Clear action so intent isn't re-processed on orientation changes
+            intent.setAction(null);
+
+            Uri sharedImageUri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+            if (sharedImageUri == null) return;
+
+            Uri sourceFolderUri = StorageHelper.getSourceFolderUri(this);
+            if (sourceFolderUri == null) {
+                Toast.makeText(this, "Select a source folder first", Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            executorService.execute(() -> {
+                Uri newCopiedSourceUri = FileUtil.copyFileAndGetUri(this, sharedImageUri, sourceFolderUri);
+                runOnUiThread(() -> {
+                    if (newCopiedSourceUri != null) {
+                        loadSourceTab();
+                        openTagDialogForUri(newCopiedSourceUri, "");
+                    } else {
+                        Toast.makeText(this, "Could not save shared image", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            });
+        }
+    }
+
+    private void performDestinationAutoClean() {
+        Uri sourceFolderUri = StorageHelper.getSourceFolderUri(this);
+        Uri destFolderUri = StorageHelper.getDestinationFolderUri(this);
+
+        if (destFolderUri == null) return;
+
+        // Skip cleanup completely if source and destination folders are the same
+        if (sourceFolderUri != null && sourceFolderUri.toString().equals(destFolderUri.toString())) {
+            return;
+        }
+
+        executorService.execute(() -> {
+            try {
+                long thresholdTime = System.currentTimeMillis() - CLEANUP_THRESHOLD_MS;
+                List<CopiedMeme> expiredMemes = MemeDatabase.getDatabase(this).copiedMemeDao().getExpiredCopied(thresholdTime);
+
+                if (expiredMemes == null || expiredMemes.isEmpty()) {
+                    return;
+                }
+
+                int deletedCount = 0;
+                for (CopiedMeme m : expiredMemes) {
+                    try {
+                        Uri destUri = Uri.parse(m.destImageUri);
+                        FileUtil.deleteFile(this, destUri);
+                        MemeDatabase.getDatabase(this).copiedMemeDao().deleteByDestUri(m.destImageUri);
+                        deletedCount++;
+                    } catch (Exception ignored) {}
+                }
+
+                if (deletedCount > 0) {
+                    runOnUiThread(() -> {
+                        if (llDestinationTab != null && llDestinationTab.getVisibility() == View.VISIBLE) {
+                            loadDestinationTab();
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                Log.e(PERF_TAG, "Error in destination auto clean", e);
+            }
+        });
     }
 
     @Override

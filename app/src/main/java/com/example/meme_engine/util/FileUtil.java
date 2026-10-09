@@ -11,8 +11,12 @@ public class FileUtil {
     private static final String TAG = "FileUtil";
 
     public static boolean copyFile(Context context, Uri sourceUri, Uri destFolderUri) {
+        return copyFileAndGetUri(context, sourceUri, destFolderUri) != null;
+    }
+
+    public static Uri copyFileAndGetUri(Context context, Uri sourceUri, Uri destFolderUri) {
         if (context == null || sourceUri == null || destFolderUri == null) {
-            return false;
+            return null;
         }
         try {
             DocumentFile sourceFile = DocumentFile.fromSingleUri(context, sourceUri);
@@ -20,7 +24,7 @@ public class FileUtil {
 
             if (destFolder == null || !destFolder.isDirectory()) {
                 Log.e(TAG, "Destination folder is invalid or not a directory.");
-                return false;
+                return null;
             }
 
             String fileName = (sourceFile != null && sourceFile.getName() != null)
@@ -34,13 +38,13 @@ public class FileUtil {
             DocumentFile newFile = destFolder.createFile(mimeType, fileName);
             if (newFile == null) {
                 Log.e(TAG, "Failed to create new file in destination folder.");
-                return false;
+                return null;
             }
 
             try (InputStream in = context.getContentResolver().openInputStream(sourceUri);
                  OutputStream out = context.getContentResolver().openOutputStream(newFile.getUri())) {
 
-                if (in == null || out == null) return false;
+                if (in == null || out == null) return null;
 
                 byte[] buffer = new byte[8192];
                 int bytesRead;
@@ -48,11 +52,11 @@ public class FileUtil {
                     out.write(buffer, 0, bytesRead);
                 }
                 out.flush();
-                return true;
+                return newFile.getUri();
             }
         } catch (Exception e) {
             Log.e(TAG, "Error copying file: " + e.getMessage(), e);
-            return false;
+            return null;
         }
     }
 

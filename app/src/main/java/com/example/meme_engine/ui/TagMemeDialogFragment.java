@@ -15,6 +15,8 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.DialogFragment;
 import com.bumptech.glide.Glide;
 import com.example.meme_engine.R;
+import com.example.meme_engine.data.CopiedMeme;
+import com.example.meme_engine.data.MemeDatabase;
 import com.example.meme_engine.util.FileUtil;
 import com.example.meme_engine.util.StorageHelper;
 import java.util.concurrent.Executors;
@@ -110,7 +112,12 @@ public class TagMemeDialogFragment extends DialogFragment {
             }
 
             Executors.newSingleThreadExecutor().execute(() -> {
-                boolean success = FileUtil.copyFile(requireContext(), uri, destFolderUri);
+                Uri copiedDestUri = FileUtil.copyFileAndGetUri(requireContext(), uri, destFolderUri);
+                boolean success = copiedDestUri != null;
+                if (success) {
+                    CopiedMeme copiedMeme = new CopiedMeme(copiedDestUri.toString(), System.currentTimeMillis(), uri.toString());
+                    MemeDatabase.getDatabase(requireContext()).copiedMemeDao().insert(copiedMeme);
+                }
                 if (getActivity() != null) {
                     getActivity().runOnUiThread(() -> {
                         if (success) {
