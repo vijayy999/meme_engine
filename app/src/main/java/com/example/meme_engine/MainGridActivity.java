@@ -1,6 +1,7 @@
 package com.example.meme_engine;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -12,11 +13,13 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
@@ -250,6 +253,37 @@ public class MainGridActivity extends AppCompatActivity {
             public void onTabReselected(TabLayout.Tab tab) {}
         });
 
+        // Modern Back Press Handling
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                // 1. Check if Destination tab multi-select is active
+                if (llDestinationTab != null && llDestinationTab.getVisibility() == View.VISIBLE
+                        && destinationAdapter != null && !destinationAdapter.getSelectedUris().isEmpty()) {
+                    destinationAdapter.clearSelection();
+                    return;
+                }
+
+                // 2. Check if Search box contains text
+                if (etSourceSearch != null && etSourceSearch.getText() != null
+                        && !etSourceSearch.getText().toString().trim().isEmpty()) {
+                    etSourceSearch.setText("");
+                    etSourceSearch.clearFocus();
+
+                    InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                    if (imm != null) {
+                        imm.hideSoftInputFromWindow(etSourceSearch.getWindowToken(), 0);
+                    }
+                    return;
+                }
+
+                // 3. Otherwise, pass back press to default system handling (exit app)
+                setEnabled(false);
+                getOnBackPressedDispatcher().onBackPressed();
+                setEnabled(true);
+            }
+        });
+
         checkPermissionAndLoad();
     }
 
@@ -266,7 +300,7 @@ public class MainGridActivity extends AppCompatActivity {
 
         if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
             loadSourceTab();
-            // Trigger automatic background update check after permission & load flow
+            // Trigger automatic background update check after permission flow
             UpdateManager.checkAutomaticUpdate(this);
         } else {
             requestPermissionLauncher.launch(permission);
