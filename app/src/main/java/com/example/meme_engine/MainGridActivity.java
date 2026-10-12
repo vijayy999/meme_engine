@@ -809,9 +809,34 @@ public class MainGridActivity extends AppCompatActivity {
         tvDestinationFolderName.setText("Destination: " + StorageHelper.getFolderName(this, destFolder));
 
         MemeScanner.scanFolder(this, destFolder, imageUris -> {
-            runOnUiThread(() -> {
-                destinationAdapter.setImages(imageUris);
-                tvDestinationEmpty.setVisibility(imageUris.isEmpty() ? View.VISIBLE : View.GONE);
+            executorService.execute(() -> {
+                List<CopiedMeme> copiedMemes = MemeDatabase.getDatabase(this).copiedMemeDao().getAll();
+                Map<String, Long> timestampMap = new HashMap<>();
+                if (copiedMemes != null) {
+                    for (CopiedMeme cm : copiedMemes) {
+                        timestampMap.put(cm.destImageUri, cm.copyTimestamp);
+                    }
+                }
+
+                imageUris.sort((u1, u2) -> {
+                    Long t1 = timestampMap.get(u1.toString());
+                    Long t2 = timestampMap.get(u2.toString());
+
+                    if (t1 != null && t2 != null) {
+                        return Long.compare(t2, t1); // Descending (newest first)
+                    } else if (t1 != null) {
+                        return -1; // u1 is tracked, place before untracked u2
+                    } else if (t2 != null) {
+                        return 1;  // u2 is tracked, place before untracked u1
+                    } else {
+                        return u1.toString().compareTo(u2.toString());
+                    }
+                });
+
+                runOnUiThread(() -> {
+                    destinationAdapter.setImages(imageUris);
+                    tvDestinationEmpty.setVisibility(imageUris.isEmpty() ? View.VISIBLE : View.GONE);
+                });
             });
         });
     }
