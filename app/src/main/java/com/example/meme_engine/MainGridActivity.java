@@ -23,6 +23,7 @@ import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
@@ -32,6 +33,7 @@ import com.example.meme_engine.data.MemeDatabase;
 import com.example.meme_engine.ui.DestinationAdapter;
 import com.example.meme_engine.ui.MemeAdapter;
 import com.example.meme_engine.ui.SearchActivity;
+import com.example.meme_engine.ui.SettingsFragment;
 import com.example.meme_engine.ui.TagMemeDialogFragment;
 import com.example.meme_engine.util.FileUtil;
 import com.example.meme_engine.util.FuzzySearchMatcher;
@@ -58,7 +60,6 @@ public class MainGridActivity extends AppCompatActivity {
 
     // Source Tab fields
     private LinearLayout llSourceTab;
-    private TextView tvSourceFolderName;
     private EditText etSourceSearch;
     private ChipGroup chipGroupFilter;
     private Chip chipRefresh;
@@ -78,7 +79,10 @@ public class MainGridActivity extends AppCompatActivity {
     private LinearLayout llMultiSelectBar;
     private TextView tvSelectedCount;
 
-    private ActivityResultLauncher<Intent> sourceFolderPickerLauncher;
+    // Source multi-select UI
+    private LinearLayout llSourceMultiSelectBar;
+    private TextView tvSourceSelectedCount;
+
     private ActivityResultLauncher<Intent> destinationFolderPickerLauncher;
     private ActivityResultLauncher<String> requestPermissionLauncher;
 
@@ -99,25 +103,12 @@ public class MainGridActivity extends AppCompatActivity {
         com.google.android.material.appbar.MaterialToolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         toolbar.setOnMenuItemClickListener(item -> {
-            if (item.getItemId() == R.id.action_check_updates) {
-                UpdateManager.checkForUpdates(this, true);
+            if (item.getItemId() == R.id.action_settings) {
+                openSettingsFragment();
                 return true;
             }
             return false;
         });
-
-        sourceFolderPickerLauncher = registerForActivityResult(
-                new ActivityResultContracts.StartActivityForResult(),
-                result -> {
-                    if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                        Uri uri = result.getData().getData();
-                        if (uri != null) {
-                            StorageHelper.setSourceFolderUri(this, uri);
-                            loadSourceTab();
-                        }
-                    }
-                }
-        );
 
         destinationFolderPickerLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
@@ -150,8 +141,6 @@ public class MainGridActivity extends AppCompatActivity {
         tabLayout.addTab(tabLayout.newTab().setText(R.string.tab_destination));
 
         llSourceTab = findViewById(R.id.llSourceTab);
-        tvSourceFolderName = findViewById(R.id.tvSourceFolderName);
-        Button btnSelectSourceFolder = findViewById(R.id.btnSelectSourceFolder);
         etSourceSearch = findViewById(R.id.etSourceSearch);
         chipGroupFilter = findViewById(R.id.chipGroupFilter);
         chipRefresh = findViewById(R.id.chipRefresh);
@@ -168,14 +157,32 @@ public class MainGridActivity extends AppCompatActivity {
         Button btnDeleteSelected = findViewById(R.id.btnDeleteSelected);
         Button btnCancelSelection = findViewById(R.id.btnCancelSelection);
 
+        llSourceMultiSelectBar = findViewById(R.id.llSourceMultiSelectBar);
+        tvSourceSelectedCount = findViewById(R.id.tvSourceSelectedCount);
+        Button btnSourceCancelSelection = findViewById(R.id.btnSourceCancelSelection);
+        Button btnSourceDeleteSelected = findViewById(R.id.btnSourceDeleteSelected);
+
         // Source Adapter
-        sourceAdapter = new MemeAdapter(this::openTagDialogForUri);
+        sourceAdapter = new MemeAdapter(new MemeAdapter.SourceListener() {
+            @Override
+            public void onMemeClick(Uri uri, String existingTags) {
+                openTagDialogForUri(uri, existingTags);
+            }
+
+            @Override
+            public void onSelectionChanged(int count) {
+                if (count > 0) {
+                    llSourceMultiSelectBar.setVisibility(View.VISIBLE);
+                    tvSourceSelectedCount.setText(count + " Selected");
+                } else {
+                    llSourceMultiSelectBar.setVisibility(View.GONE);
+                }
+            }
+        });
         rvSourceGrid.setAdapter(sourceAdapter);
 
-        btnSelectSourceFolder.setOnClickListener(v -> {
-            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-            sourceFolderPickerLauncher.launch(intent);
-        });
+        btnSourceCancelSelection.setOnClickListener(v -> sourceAdapter.clearSelection());
+        btnSourceDeleteSelected.setOnClickListener(v -> confirmDeleteSourceMemes());
 
         // WHY: Re-filter instantly on search text change while keeping full memory list intact
         etSourceSearch.addTextChangedListener(new TextWatcher() {
@@ -255,18 +262,31 @@ public class MainGridActivity extends AppCompatActivity {
             public void onTabReselected(TabLayout.Tab tab) {}
         });
 
-        // Modern Back Press Handling
+        // Modern Back Press Handling (supports closing SettingsFragment if open)
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
-                // 1. Check if Destination tab multi-select is active
+                // If SettingsFragment is open, pop it first
+                if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+                    getSupportFragmentManager().popBackStack();
+                    return;
+                }
+
+                // 1. Check if Source tab multi-select is active
+                if (llSourceTab != null && llSourceTab.getVisibility() == View.VISIBLE
+                        && sourceAdapter != null && !sourceAdapter.getSelectedUris().isEmpty()) {
+                    sourceAdapter.clearSelection();
+                    return;
+                }
+
+                // 2. Check if Destination tab multi-select is active
                 if (llDestinationTab != null && llDestinationTab.getVisibility() == View.VISIBLE
                         && destinationAdapter != null && !destinationAdapter.getSelectedUris().isEmpty()) {
                     destinationAdapter.clearSelection();
                     return;
                 }
 
-                // 2. Check if Search box contains text
+                // 3. Check if Search box contains text
                 if (etSourceSearch != null && etSourceSearch.getText() != null
                         && !etSourceSearch.getText().toString().trim().isEmpty()) {
                     etSourceSearch.setText("");
@@ -286,8 +306,31 @@ public class MainGridActivity extends AppCompatActivity {
             }
         });
 
+        getSupportFragmentManager().addOnBackStackChangedListener(() -> {
+            View container = findViewById(R.id.fragmentContainer);
+            if (container != null) {
+                if (getSupportFragmentManager().getBackStackEntryCount() == 0) {
+                    container.setVisibility(View.GONE);
+                    loadSourceTab();
+                    loadDestinationTab();
+                }
+            }
+        });
+
         checkPermissionAndLoad();
         handleSharedImageIntent(getIntent());
+    }
+
+    private void openSettingsFragment() {
+        View container = findViewById(R.id.fragmentContainer);
+        if (container != null) {
+            container.setVisibility(View.VISIBLE);
+        }
+        getSupportFragmentManager().beginTransaction()
+                .setCustomAnimations(R.anim.slide_in_right, R.anim.slide_out_left, R.anim.slide_in_left, R.anim.slide_out_right)
+                .replace(R.id.fragmentContainer, new SettingsFragment())
+                .addToBackStack("settings")
+                .commit();
     }
 
     @Override
@@ -301,6 +344,10 @@ public class MainGridActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         performDestinationAutoClean();
+        loadSourceTab();
+        if (llDestinationTab != null && llDestinationTab.getVisibility() == View.VISIBLE) {
+            loadDestinationTab();
+        }
     }
 
     private void handleSharedImageIntent(Intent intent) {
@@ -332,7 +379,83 @@ public class MainGridActivity extends AppCompatActivity {
                     }
                 });
             });
+        } else if (Intent.ACTION_SEND_MULTIPLE.equals(action) && type != null && type.startsWith("image/")) {
+            intent.setAction(null);
+
+            ArrayList<Uri> imageUris = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+            if (imageUris == null || imageUris.isEmpty()) return;
+
+            Uri sourceFolderUri = StorageHelper.getSourceFolderUri(this);
+            if (sourceFolderUri == null) {
+                Toast.makeText(this, "Select a source folder first", Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            processBatchSharedImages(imageUris, 0, new int[]{0}, sourceFolderUri);
         }
+    }
+
+    private void processBatchSharedImages(List<Uri> imageUris, int index, int[] copiedCountHolder, Uri sourceFolderUri) {
+        if (index >= imageUris.size()) {
+            finishBatchShare(copiedCountHolder[0]);
+            return;
+        }
+
+        Uri currentUri = imageUris.get(index);
+        if (currentUri == null) {
+            processBatchSharedImages(imageUris, index + 1, copiedCountHolder, sourceFolderUri);
+            return;
+        }
+
+        executorService.execute(() -> {
+            Uri newCopiedSourceUri = FileUtil.copyFileAndGetUri(this, currentUri, sourceFolderUri);
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed()) return;
+
+                if (newCopiedSourceUri != null) {
+                    copiedCountHolder[0]++;
+                    loadSourceTab();
+
+                    TagMemeDialogFragment dialog = TagMemeDialogFragment.newBatchInstance(newCopiedSourceUri, index + 1, imageUris.size());
+                    dialog.setOnBatchListener(new TagMemeDialogFragment.OnBatchListener() {
+                        @Override
+                        public void onOk(Uri uri, String tags) {
+                            if (tags != null && !tags.trim().isEmpty()) {
+                                executorService.execute(() -> {
+                                    long now = System.currentTimeMillis();
+                                    Meme meme = new Meme(uri.toString(), tags, now, now);
+                                    MemeDatabase.getDatabase(MainGridActivity.this).memeDao().insert(meme);
+                                    runOnUiThread(() -> {
+                                        applyFilters();
+                                        processBatchSharedImages(imageUris, index + 1, copiedCountHolder, sourceFolderUri);
+                                    });
+                                });
+                            } else {
+                                processBatchSharedImages(imageUris, index + 1, copiedCountHolder, sourceFolderUri);
+                            }
+                        }
+
+                        @Override
+                        public void onSkip(Uri uri) {
+                            processBatchSharedImages(imageUris, index + 1, copiedCountHolder, sourceFolderUri);
+                        }
+
+                        @Override
+                        public void onCancelAll() {
+                            finishBatchShare(copiedCountHolder[0]);
+                        }
+                    });
+                    dialog.show(getSupportFragmentManager(), "BatchTagMemeDialog");
+                } else {
+                    processBatchSharedImages(imageUris, index + 1, copiedCountHolder, sourceFolderUri);
+                }
+            });
+        });
+    }
+
+    private void finishBatchShare(int copiedCount) {
+        loadSourceTab();
+        Toast.makeText(this, copiedCount + " memes added to source folder", Toast.LENGTH_SHORT).show();
     }
 
     private void performDestinationAutoClean() {
@@ -401,11 +524,8 @@ public class MainGridActivity extends AppCompatActivity {
     private void loadSourceTab() {
         Uri sourceFolder = StorageHelper.getSourceFolderUri(this);
         if (sourceFolder == null) {
-            tvSourceFolderName.setText(R.string.no_destination_folder);
             return;
         }
-
-        tvSourceFolderName.setText("Source: " + StorageHelper.getFolderName(this, sourceFolder));
 
         final long totalStartTime = System.nanoTime();
 
@@ -724,6 +844,45 @@ public class MainGridActivity extends AppCompatActivity {
                 Toast.makeText(this, finalCount + " file(s) deleted", Toast.LENGTH_SHORT).show();
                 destinationAdapter.clearSelection();
                 loadDestinationTab();
+            });
+        });
+    }
+
+    private void confirmDeleteSourceMemes() {
+        Set<Uri> selected = sourceAdapter.getSelectedUris();
+        if (selected.isEmpty()) return;
+
+        int count = selected.size();
+        new AlertDialog.Builder(this)
+                .setTitle("Delete Memes")
+                .setMessage("Are you sure you want to delete " + count + " meme(s)? This will permanently delete the image(s) from your phone and cannot be undone.")
+                .setPositiveButton("Delete", (dialog, which) -> deleteSelectedSourceMemes(selected))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void deleteSelectedSourceMemes(Set<Uri> selected) {
+        executorService.execute(() -> {
+            int deletedCount = 0;
+            for (Uri uri : selected) {
+                try {
+                    boolean success = FileUtil.deleteFile(this, uri);
+                    if (success) {
+                        deletedCount++;
+                        String uriStr = uri.toString();
+                        MemeDatabase.getDatabase(this).memeDao().deleteByUri(uriStr);
+                        MemeDatabase.getDatabase(this).copiedMemeDao().deleteBySourceUri(uriStr);
+                    }
+                } catch (Exception e) {
+                    Log.e(PERF_TAG, "Error deleting source meme: " + uri, e);
+                }
+            }
+
+            int finalDeletedCount = deletedCount;
+            runOnUiThread(() -> {
+                Toast.makeText(this, finalDeletedCount + " meme(s) deleted", Toast.LENGTH_SHORT).show();
+                sourceAdapter.clearSelection();
+                loadSourceTab();
             });
         });
     }

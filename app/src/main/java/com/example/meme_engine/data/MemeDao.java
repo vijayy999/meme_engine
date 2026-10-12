@@ -20,4 +20,7 @@ public interface MemeDao {
 
     @Query("SELECT * FROM memes")
     List<Meme> getAll();
+
+    @Query("DELETE FROM memes WHERE imageUri = :imageUri")
+    void deleteByUri(String imageUri);
 }

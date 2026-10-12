@@ -20,4 +20,7 @@ public interface CopiedMemeDao {
 
     @Query("SELECT * FROM copied_memes")
     List<CopiedMeme> getAll();
+
+    @Query("DELETE FROM copied_memes WHERE sourceImageUri = :sourceImageUri")
+    void deleteBySourceUri(String sourceImageUri);
 }

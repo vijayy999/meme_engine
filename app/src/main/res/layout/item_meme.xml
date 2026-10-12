@@ -29,6 +29,29 @@
             app:layout_constraintTop_toTopOf="parent"
             android:contentDescription="@string/meme_thumbnail" />
 
+        <View
+            android:id="@+id/vSelectionOverlay"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="#808B5CF6"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="@+id/ivMemeThumbnail"
+            app:layout_constraintEnd_toEndOf="@+id/ivMemeThumbnail"
+            app:layout_constraintStart_toStartOf="@+id/ivMemeThumbnail"
+            app:layout_constraintTop_toTopOf="@+id/ivMemeThumbnail" />
+
+        <ImageView
+            android:id="@+id/ivCheckmark"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:src="@drawable/ic_tag_done"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="@+id/ivMemeThumbnail"
+            app:layout_constraintEnd_toEndOf="@+id/ivMemeThumbnail"
+            app:layout_constraintStart_toStartOf="@+id/ivMemeThumbnail"
+            app:layout_constraintTop_toTopOf="@+id/ivMemeThumbnail"
+            android:contentDescription="@string/tag_status_badge" />
+
         <!-- Tag Text Preview Overlay (Bottom Left) -->
         <TextView
             android:id="@+id/tvTagPreview"

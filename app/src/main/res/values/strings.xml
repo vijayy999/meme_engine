@@ -5,6 +5,8 @@
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
     <string name="ok">OK</string>
+    <string name="skip">Skip</string>
+    <string name="cancel_all">Cancel All</string>
     <string name="destination">Destination</string>
     <string name="normal_tags_label">Normal Tags:</string>
     <string name="normal_tags_hint">e.g. gta fail, funny</string>
@@ -21,6 +23,7 @@
     <string name="tab_destination">Destination</string>
     <string name="select_source_folder">Source Folder</string>
     <string name="select_destination_folder">Destination Folder</string>
+    <string name="backup_folder_label">Backup Folder</string>
     <string name="no_destination_folder">No destination folder set. Tap to select.</string>
     <string name="copied_to_destination">Copied to Destination folder!</string>
     <string name="failed_to_copy">Failed to copy image.</string>
@@ -32,4 +35,5 @@
     <string name="chip_tagged">Tagged</string>
     <string name="chip_untagged">Untagged</string>
     <string name="chip_refresh">Refresh</string>
+    <string name="action_settings">Settings</string>
 </resources>

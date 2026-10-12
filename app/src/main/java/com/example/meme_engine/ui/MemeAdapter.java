@@ -12,31 +12,49 @@ import com.bumptech.glide.Glide;
 import com.example.meme_engine.R;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class MemeAdapter extends RecyclerView.Adapter<MemeAdapter.MemeViewHolder> {
 
     private List<Uri> imageUris = new ArrayList<>();
     private Map<String, String> memeTags = new HashMap<>();
-    private final OnMemeClickListener listener;
+    private final Set<Uri> selectedUris = new HashSet<>();
+    private boolean isMultiSelectMode = false;
+    private final SourceListener listener;
 
-    public interface OnMemeClickListener {
+    public interface SourceListener {
         void onMemeClick(Uri uri, String existingTags);
+        void onSelectionChanged(int count);
     }
 
-    public MemeAdapter(OnMemeClickListener listener) {
+    public MemeAdapter(SourceListener listener) {
         this.listener = listener;
     }
 
     public void setImages(List<Uri> uris) {
-        this.imageUris = uris;
+        this.imageUris = uris != null ? uris : new ArrayList<>();
+        this.selectedUris.clear();
+        this.isMultiSelectMode = false;
         notifyDataSetChanged();
     }
 
     public void setTags(Map<String, String> tags) {
-        this.memeTags = tags;
+        this.memeTags = tags != null ? tags : new HashMap<>();
         notifyDataSetChanged();
+    }
+
+    public Set<Uri> getSelectedUris() {
+        return new HashSet<>(selectedUris);
+    }
+
+    public void clearSelection() {
+        selectedUris.clear();
+        isMultiSelectMode = false;
+        notifyDataSetChanged();
+        if (listener != null) listener.onSelectionChanged(0);
     }
 
     @NonNull
@@ -69,7 +87,44 @@ public class MemeAdapter extends RecyclerView.Adapter<MemeAdapter.MemeViewHolder
             }
         }
 
-        holder.itemView.setOnClickListener(v -> listener.onMemeClick(uri, tags));
+        boolean isSelected = selectedUris.contains(uri);
+        holder.vSelectionOverlay.setVisibility(isSelected ? View.VISIBLE : View.GONE);
+        holder.ivCheckmark.setVisibility(isSelected ? View.VISIBLE : View.GONE);
+
+        // Hide tag badge during multi-select
+        holder.ivBadge.setVisibility(isMultiSelectMode ? View.GONE : View.VISIBLE);
+
+        holder.itemView.setOnClickListener(v -> {
+            if (isMultiSelectMode) {
+                toggleSelection(uri);
+            } else {
+                listener.onMemeClick(uri, tags);
+            }
+        });
+
+        holder.itemView.setOnLongClickListener(v -> {
+            if (!isMultiSelectMode) {
+                isMultiSelectMode = true;
+                toggleSelection(uri);
+                return true;
+            }
+            return false;
+        });
+    }
+
+    private void toggleSelection(Uri uri) {
+        if (selectedUris.contains(uri)) {
+            selectedUris.remove(uri);
+        } else {
+            selectedUris.add(uri);
+        }
+        if (selectedUris.isEmpty()) {
+            isMultiSelectMode = false;
+        }
+        notifyDataSetChanged();
+        if (listener != null) {
+            listener.onSelectionChanged(selectedUris.size());
+        }
     }
 
     @Override
@@ -81,12 +136,16 @@ public class MemeAdapter extends RecyclerView.Adapter<MemeAdapter.MemeViewHolder
         ImageView ivMemeThumbnail;
         ImageView ivBadge;
         TextView tvTagPreview;
+        View vSelectionOverlay;
+        ImageView ivCheckmark;
 
         public MemeViewHolder(@NonNull View itemView) {
             super(itemView);
             ivMemeThumbnail = itemView.findViewById(R.id.ivMemeThumbnail);
             ivBadge = itemView.findViewById(R.id.ivBadge);
             tvTagPreview = itemView.findViewById(R.id.tvTagPreview);
+            vSelectionOverlay = itemView.findViewById(R.id.vSelectionOverlay);
+            ivCheckmark = itemView.findViewById(R.id.ivCheckmark);
         }
     }
 }

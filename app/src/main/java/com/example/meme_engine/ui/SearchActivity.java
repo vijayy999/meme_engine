@@ -46,7 +46,17 @@ public class SearchActivity extends AppCompatActivity {
                        (getComponentName() != null && getComponentName().getShortClassName().contains("MemePickerAlias"));
 
         RecyclerView rv = findViewById(R.id.rvSearchResults);
-        adapter = new MemeAdapter(this::onMemeSelected);
+        adapter = new MemeAdapter(new MemeAdapter.SourceListener() {
+            @Override
+            public void onMemeClick(Uri uri, String existingTags) {
+                onMemeSelected(uri, existingTags);
+            }
+
+            @Override
+            public void onSelectionChanged(int count) {
+                // Not used in SearchActivity
+            }
+        });
         rv.setAdapter(adapter);
 
         EditText etSearch = findViewById(R.id.etSearch);

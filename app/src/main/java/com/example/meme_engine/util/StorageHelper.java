@@ -10,6 +10,7 @@ public class StorageHelper {
     private static final String PREFS_NAME = "meme_engine_prefs";
     private static final String KEY_ROOT_FOLDER_URI = "root_folder_uri";
     private static final String KEY_DESTINATION_FOLDER_URI = "destination_folder_uri";
+    private static final String KEY_BACKUP_FOLDER_URI = "backup_folder_uri";
 
     public static void setSourceFolderUri(Context context, Uri uri) {
         setRootFolderUri(context, uri);
@@ -54,6 +55,25 @@ public class StorageHelper {
     public static Uri getDestinationFolderUri(Context context) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String uriString = prefs.getString(KEY_DESTINATION_FOLDER_URI, null);
+        return uriString != null ? Uri.parse(uriString) : null;
+    }
+
+    public static void setBackupFolderUri(Context context, Uri uri) {
+        if (uri == null) return;
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putString(KEY_BACKUP_FOLDER_URI, uri.toString()).apply();
+
+        try {
+            int takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+            context.getContentResolver().takePersistableUriPermission(uri, takeFlags);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static Uri getBackupFolderUri(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String uriString = prefs.getString(KEY_BACKUP_FOLDER_URI, null);
         return uriString != null ? Uri.parse(uriString) : null;
     }
 

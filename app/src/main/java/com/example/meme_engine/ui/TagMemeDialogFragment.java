@@ -12,6 +12,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.DialogFragment;
 import com.bumptech.glide.Glide;
 import com.example.meme_engine.R;
@@ -25,11 +26,20 @@ public class TagMemeDialogFragment extends DialogFragment {
 
     private static final String ARG_URI = "uri";
     private static final String ARG_TAGS = "tags";
+    private static final String ARG_BATCH_INDEX = "batch_index";
+    private static final String ARG_BATCH_TOTAL = "batch_total";
 
     private OnTagSavedListener listener;
+    private OnBatchListener batchListener;
 
     public interface OnTagSavedListener {
         void onTagSaved(Uri uri, String tags);
+    }
+
+    public interface OnBatchListener {
+        void onOk(Uri uri, String tags);
+        void onSkip(Uri uri);
+        void onCancelAll();
     }
 
     public static TagMemeDialogFragment newInstance(Uri uri, String existingTags) {
@@ -41,8 +51,23 @@ public class TagMemeDialogFragment extends DialogFragment {
         return fragment;
     }
 
+    public static TagMemeDialogFragment newBatchInstance(Uri uri, int currentIndex, int totalCount) {
+        TagMemeDialogFragment fragment = new TagMemeDialogFragment();
+        Bundle args = new Bundle();
+        args.putParcelable(ARG_URI, uri);
+        args.putString(ARG_TAGS, "");
+        args.putInt(ARG_BATCH_INDEX, currentIndex);
+        args.putInt(ARG_BATCH_TOTAL, totalCount);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
     public void setOnTagSavedListener(OnTagSavedListener listener) {
         this.listener = listener;
+    }
+
+    public void setOnBatchListener(OnBatchListener batchListener) {
+        this.batchListener = batchListener;
     }
 
     @NonNull
@@ -54,6 +79,9 @@ public class TagMemeDialogFragment extends DialogFragment {
 
         Uri uri = getArguments().getParcelable(ARG_URI);
         String existingTags = getArguments().getString(ARG_TAGS);
+        int batchIndex = getArguments().getInt(ARG_BATCH_INDEX, -1);
+        int batchTotal = getArguments().getInt(ARG_BATCH_TOTAL, -1);
+        boolean isBatch = batchIndex > 0 && batchTotal > 0;
 
         View view = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_tag_meme, null);
         ImageView ivPreview = view.findViewById(R.id.ivTagPreview);
@@ -85,52 +113,87 @@ public class TagMemeDialogFragment extends DialogFragment {
         etTags.setText(normalBuilder.toString().trim());
         etHashtags.setText(hashtagsBuilder.toString().trim());
 
-        AlertDialog dialog = new AlertDialog.Builder(requireContext())
-                .setView(view)
-                .create();
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext())
+                .setView(view);
 
-        btnSave.setOnClickListener(v -> {
-            if (listener != null && uri != null) {
-                String combined = combineTags(etTags.getText().toString(), etHashtags.getText().toString());
-                listener.onTagSaved(uri, combined);
-            }
-            dismiss();
-        });
+        if (isBatch) {
+            builder.setTitle("Tag this meme (" + batchIndex + " of " + batchTotal + ")");
+            setCancelable(false);
+        }
 
-        btnCancel.setOnClickListener(v -> dismiss());
+        AlertDialog dialog = builder.create();
 
-        btnDestination.setOnClickListener(v -> {
-            if (listener != null && uri != null) {
-                String combined = combineTags(etTags.getText().toString(), etHashtags.getText().toString());
-                listener.onTagSaved(uri, combined);
-            }
+        if (isBatch) {
+            btnSave.setText(R.string.ok);
+            btnCancel.setText(R.string.skip);
+            btnDestination.setText(R.string.cancel_all);
+            btnDestination.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.surface_border));
 
-            Uri destFolderUri = StorageHelper.getDestinationFolderUri(requireContext());
-            if (destFolderUri == null) {
-                Toast.makeText(requireContext(), R.string.no_destination_folder, Toast.LENGTH_LONG).show();
-                return;
-            }
-
-            Executors.newSingleThreadExecutor().execute(() -> {
-                Uri copiedDestUri = FileUtil.copyFileAndGetUri(requireContext(), uri, destFolderUri);
-                boolean success = copiedDestUri != null;
-                if (success) {
-                    CopiedMeme copiedMeme = new CopiedMeme(copiedDestUri.toString(), System.currentTimeMillis(), uri.toString());
-                    MemeDatabase.getDatabase(requireContext()).copiedMemeDao().insert(copiedMeme);
+            btnSave.setOnClickListener(v -> {
+                if (batchListener != null && uri != null) {
+                    String combined = combineTags(etTags.getText().toString(), etHashtags.getText().toString());
+                    batchListener.onOk(uri, combined);
                 }
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() -> {
-                        if (success) {
-                            Toast.makeText(requireContext(), R.string.copied_to_destination, Toast.LENGTH_SHORT).show();
-                        } else {
-                            Toast.makeText(requireContext(), R.string.failed_to_copy, Toast.LENGTH_SHORT).show();
-                        }
-                    });
-                }
+                dismiss();
             });
 
-            dismiss();
-        });
+            btnCancel.setOnClickListener(v -> {
+                if (batchListener != null && uri != null) {
+                    batchListener.onSkip(uri);
+                }
+                dismiss();
+            });
+
+            btnDestination.setOnClickListener(v -> {
+                if (batchListener != null) {
+                    batchListener.onCancelAll();
+                }
+                dismiss();
+            });
+        } else {
+            btnSave.setOnClickListener(v -> {
+                if (listener != null && uri != null) {
+                    String combined = combineTags(etTags.getText().toString(), etHashtags.getText().toString());
+                    listener.onTagSaved(uri, combined);
+                }
+                dismiss();
+            });
+
+            btnCancel.setOnClickListener(v -> dismiss());
+
+            btnDestination.setOnClickListener(v -> {
+                if (listener != null && uri != null) {
+                    String combined = combineTags(etTags.getText().toString(), etHashtags.getText().toString());
+                    listener.onTagSaved(uri, combined);
+                }
+
+                Uri destFolderUri = StorageHelper.getDestinationFolderUri(requireContext());
+                if (destFolderUri == null) {
+                    Toast.makeText(requireContext(), R.string.no_destination_folder, Toast.LENGTH_LONG).show();
+                    return;
+                }
+
+                Executors.newSingleThreadExecutor().execute(() -> {
+                    Uri copiedDestUri = FileUtil.copyFileAndGetUri(requireContext(), uri, destFolderUri);
+                    boolean success = copiedDestUri != null;
+                    if (success) {
+                        CopiedMeme copiedMeme = new CopiedMeme(copiedDestUri.toString(), System.currentTimeMillis(), uri.toString());
+                        MemeDatabase.getDatabase(requireContext()).copiedMemeDao().insert(copiedMeme);
+                    }
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            if (success) {
+                                Toast.makeText(requireContext(), R.string.copied_to_destination, Toast.LENGTH_SHORT).show();
+                            } else {
+                                Toast.makeText(requireContext(), R.string.failed_to_copy, Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }
+                });
+
+                dismiss();
+            });
+        }
 
         return dialog;
     }
