@@ -17,7 +17,9 @@ import androidx.fragment.app.DialogFragment;
 import com.bumptech.glide.Glide;
 import com.example.meme_engine.R;
 import com.example.meme_engine.data.CopiedMeme;
+import com.example.meme_engine.data.Meme;
 import com.example.meme_engine.data.MemeDatabase;
+import android.content.Context;
 import com.example.meme_engine.util.FileUtil;
 import com.example.meme_engine.util.StorageHelper;
 import java.util.concurrent.Executors;
@@ -162,33 +164,40 @@ public class TagMemeDialogFragment extends DialogFragment {
             btnCancel.setOnClickListener(v -> dismiss());
 
             btnDestination.setOnClickListener(v -> {
-                if (listener != null && uri != null) {
-                    String combined = combineTags(etTags.getText().toString(), etHashtags.getText().toString());
-                    listener.onTagSaved(uri, combined);
-                }
-
-                Uri destFolderUri = StorageHelper.getDestinationFolderUri(requireContext());
+                Context appContext = requireContext().getApplicationContext();
+                Uri destFolderUri = StorageHelper.getDestinationFolderUri(appContext);
                 if (destFolderUri == null) {
-                    Toast.makeText(requireContext(), R.string.no_destination_folder, Toast.LENGTH_LONG).show();
+                    Toast.makeText(appContext, R.string.no_destination_folder, Toast.LENGTH_LONG).show();
                     return;
                 }
 
+                String combinedTags = combineTags(etTags.getText().toString(), etHashtags.getText().toString());
+                android.app.Activity hostActivity = getActivity();
+
                 Executors.newSingleThreadExecutor().execute(() -> {
-                    Uri copiedDestUri = FileUtil.copyFileAndGetUri(requireContext(), uri, destFolderUri);
+                    if (uri != null && combinedTags != null) {
+                        Meme existing = MemeDatabase.getDatabase(appContext).memeDao().getByUri(uri.toString());
+                        long originalFirstSeen = existing != null ? existing.firstSeen : System.currentTimeMillis();
+                        long dateAdded = existing != null ? existing.dateAdded : System.currentTimeMillis();
+                        Meme meme = new Meme(uri.toString(), combinedTags, dateAdded, originalFirstSeen);
+                        MemeDatabase.getDatabase(appContext).memeDao().insert(meme);
+                    }
+
+                    Uri copiedDestUri = FileUtil.copyFileAndGetUri(appContext, uri, destFolderUri);
                     boolean success = copiedDestUri != null;
                     if (success) {
                         CopiedMeme copiedMeme = new CopiedMeme(copiedDestUri.toString(), System.currentTimeMillis(), uri.toString());
-                        MemeDatabase.getDatabase(requireContext()).copiedMemeDao().insert(copiedMeme);
+                        MemeDatabase.getDatabase(appContext).copiedMemeDao().insert(copiedMeme);
                     }
-                    if (getActivity() != null) {
-                        getActivity().runOnUiThread(() -> {
-                            if (success) {
-                                Toast.makeText(requireContext(), R.string.copied_to_destination, Toast.LENGTH_SHORT).show();
-                            } else {
-                                Toast.makeText(requireContext(), R.string.failed_to_copy, Toast.LENGTH_SHORT).show();
-                            }
-                        });
-                    }
+
+                    new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                        Context ctx = (isAdded() && getContext() != null) ? getContext() : appContext;
+                        Toast.makeText(ctx, success ? R.string.copied_to_destination : R.string.failed_to_copy, Toast.LENGTH_SHORT).show();
+
+                        if (success && hostActivity instanceof com.example.meme_engine.MainGridActivity) {
+                            ((com.example.meme_engine.MainGridActivity) hostActivity).loadDestinationTab();
+                        }
+                    });
                 });
 
                 dismiss();

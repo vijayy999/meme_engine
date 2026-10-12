@@ -797,7 +797,7 @@ public class MainGridActivity extends AppCompatActivity {
         dialog.show(getSupportFragmentManager(), "TagMemeDialog");
     }
 
-    private void loadDestinationTab() {
+    public void loadDestinationTab() {
         Uri destFolder = StorageHelper.getDestinationFolderUri(this);
         if (destFolder == null) {
             tvDestinationFolderName.setText(R.string.no_destination_folder);
