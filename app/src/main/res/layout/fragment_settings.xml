@@ -115,7 +115,8 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:background="@color/surface_border" />
+                    android:background="@color/surface_border"
+                    android:visibility="gone" />
 
                 <!-- 3. Backup Folder Item -->
                 <LinearLayout
@@ -126,7 +127,8 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:orientation="vertical"
-                    android:paddingVertical="12dp">
+                    android:paddingVertical="12dp"
+                    android:visibility="gone">
 
                     <TextView
                         android:layout_width="wrap_content"
