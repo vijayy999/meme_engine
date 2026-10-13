@@ -9,6 +9,8 @@ import java.util.List;
  */
 public class FuzzySearchMatcher {
 
+    public static final int HASHTAG_FALLBACK_PENALTY = 1000;
+
     public static class MatchResult {
         public final boolean isMatch;
         public final int score;
@@ -54,18 +56,32 @@ public class FuzzySearchMatcher {
         // Every word in the query must match at least one candidate tag token (AND logic)
         for (String qw : queryWords) {
             boolean isHashtagQuery = qw.startsWith("#");
-            List<String> candidates = isHashtagQuery ? hashtagTokens : plainTagTokens;
 
-            if (candidates.isEmpty()) {
-                return new MatchResult(false, 0);
+            if (isHashtagQuery) {
+                if (hashtagTokens.isEmpty()) {
+                    return new MatchResult(false, 0);
+                }
+                int bestWordScore = evaluateWordMatch(qw, hashtagTokens);
+                if (bestWordScore <= 0) {
+                    return new MatchResult(false, 0);
+                }
+                totalScore += bestWordScore;
+            } else {
+                // Plain query: check plain tags first. If no plain tag matches, check hashtags with '#' stripped.
+                int bestPlainScore = plainTagTokens.isEmpty() ? 0 : evaluateWordMatch(qw, plainTagTokens);
+                if (bestPlainScore > 0) {
+                    totalScore += bestPlainScore;
+                } else {
+                    if (hashtagTokens.isEmpty()) {
+                        return new MatchResult(false, 0);
+                    }
+                    int bestHashtagFallbackScore = evaluateWordMatch(qw, hashtagTokens);
+                    if (bestHashtagFallbackScore <= 0) {
+                        return new MatchResult(false, 0);
+                    }
+                    totalScore += (bestHashtagFallbackScore - HASHTAG_FALLBACK_PENALTY);
+                }
             }
-
-            int bestWordScore = evaluateWordMatch(qw, candidates);
-            if (bestWordScore <= 0) {
-                return new MatchResult(false, 0); // Query word failed to match any tag token
-            }
-
-            totalScore += bestWordScore;
         }
 
         return new MatchResult(true, totalScore);
@@ -116,6 +132,17 @@ public class FuzzySearchMatcher {
         // Strip leading '#' for typo length evaluation and distance comparison
         String cleanQ = q.startsWith("#") ? q.substring(1) : q;
         String cleanT = t.startsWith("#") ? t.substring(1) : t;
+
+        // Also check if cleanQ matches t or vice-versa if one of them has '#'
+        if (cleanT.equals(cleanQ)) {
+            return 100;
+        }
+        if (cleanT.startsWith(cleanQ)) {
+            return 80;
+        }
+        if (cleanT.contains(cleanQ)) {
+            return 60;
+        }
 
         int cleanQLen = cleanQ.length();
         int cleanTLen = cleanT.length();

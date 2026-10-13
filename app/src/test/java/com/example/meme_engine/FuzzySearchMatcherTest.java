@@ -48,4 +48,25 @@ public class FuzzySearchMatcherTest {
         FuzzySearchMatcher.MatchResult failOne = FuzzySearchMatcher.match("happy cat", "hapy dog");
         assertFalse(failOne.isMatch);
     }
+
+    @Test
+    public void testPlainQueryMatchesHashtagFallback() {
+        // 1. "wasted #drowned #gtavc" matches "drowned"; "wasted" does not match "drowned"
+        FuzzySearchMatcher.MatchResult matchDrowned = FuzzySearchMatcher.match("wasted #drowned #gtavc", "drowned");
+        assertTrue(matchDrowned.isMatch);
+
+        FuzzySearchMatcher.MatchResult matchWasted = FuzzySearchMatcher.match("wasted #drowned #gtavc", "wasted");
+        assertTrue(matchWasted.isMatch);
+
+        // 2. A plain-tag match scores higher than a hashtag-only match
+        FuzzySearchMatcher.MatchResult plainMatch = FuzzySearchMatcher.match("drowned #other", "drowned");
+        FuzzySearchMatcher.MatchResult hashtagFallbackMatch = FuzzySearchMatcher.match("#drowned other", "drowned");
+        assertTrue(plainMatch.isMatch);
+        assertTrue(hashtagFallbackMatch.isMatch);
+        assertTrue(plainMatch.score > hashtagFallbackMatch.score);
+
+        // 3. "drowned wasted" does NOT match "#drowned"
+        FuzzySearchMatcher.MatchResult failMulti = FuzzySearchMatcher.match("#drowned", "drowned wasted");
+        assertFalse(failMulti.isMatch);
+    }
 }
